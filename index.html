@@ -94,6 +94,10 @@ button{font:inherit;color:var(--ink);cursor:pointer}
 .modal{position:fixed;inset:0;background:rgba(10,14,30,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
 .modal .box{background:var(--surface);border-radius:16px;padding:16px;max-width:560px;width:100%;max-height:92%;display:flex;flex-direction:column;gap:12px;overflow:auto}
 .modal img{width:100%;border-radius:10px;border:1px solid var(--line)}
+.msgopts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;font-size:13px}
+.msgopts label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.msgopts input{width:18px;height:18px;accent-color:var(--accent)}
+#msgText{font-size:14px;line-height:1.7}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;z-index:20;transition:opacity .2s}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 </style>
@@ -151,6 +155,7 @@ button{font:inherit;color:var(--ink);cursor:pointer}
           <h2>カレンダーに入れる</h2>
           <div class="row">
             <button class="btn" id="undo" type="button">元に戻す</button>
+            <button class="btn" id="msgBtn" type="button">配信文を作る</button>
             <button class="btn primary" id="exportBtn" type="button">画像にする</button>
           </div>
         </div>
@@ -183,6 +188,30 @@ button{font:inherit;color:var(--ink);cursor:pointer}
       <button class="btn" id="copyImg" type="button">画像をコピー</button>
     </div>
     <p class="hint">保存できないときは、画像を長押し（スマホ）または右クリック（PC）して保存してください。</p>
+    <button class="btn" id="toMsg" type="button">画像に添える配信文を作る</button>
+  </div>
+</div>
+
+<div class="modal" id="msgModal" hidden>
+  <div class="box">
+    <div class="row spread"><h2 style="margin:0;font-family:var(--display)">配信文</h2><button class="btn" id="closeMsg" type="button">閉じる</button></div>
+    <label class="f" for="msgIntro">はじめのあいさつ（「{月}」は月の数字になります）
+      <input type="text" id="msgIntro">
+    </label>
+    <div class="msgopts">
+      <label><input type="checkbox" id="msgEmoji"> 絵文字を入れる</label>
+      <label><input type="checkbox" id="msgOff"> お休みの日も書く</label>
+      <label><input type="checkbox" id="msgNotes"> 注意書きを入れる</label>
+      <label><input type="checkbox" id="msgFromToday"> 今日以降の予定だけ</label>
+    </div>
+    <label class="f" for="msgText">できあがった文章（ここで直接書き直せます）
+      <textarea id="msgText" rows="12"></textarea>
+    </label>
+    <div class="row">
+      <button class="btn primary" id="copyMsg" type="button">コピー</button>
+      <button class="btn" id="shareMsg" type="button" hidden>LINEなどで送る</button>
+      <button class="btn" id="resetMsg" type="button">設定どおりに作り直す</button>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -778,6 +807,63 @@ $('#shareImg').addEventListener('click', async () => {
   if(!outBlob) return;
   try{ await navigator.share({files:[new File([outBlob], imgName(), {type:'image/png'})], title:`${state.cur.m}月の練習日程`}); }
   catch(e){ if(e && e.name !== 'AbortError') toast('共有できませんでした。「画像を保存」を使ってください'); }
+});
+
+/* ---------- announcement text ---------- */
+const MSG_DEFAULT = {intro:'お疲れさまです！{月}月の練習日程をお知らせします。', emoji:true, off:true, notes:true, fromToday:false};
+const msgOpts = () => (state.msg = Object.assign({}, MSG_DEFAULT, state.msg || {}));
+function buildMessage(){
+  const o = msgOpts(), {y,m} = state.cur, days = monthData().days, nd = new Date(y,m,0).getDate();
+  const now = new Date(), fromDay = o.fromToday && now.getFullYear() === y && now.getMonth()+1 === m ? now.getDate() : 1;
+  const name = state.title || '練習日程表';
+  const out = [];
+  out.push(o.emoji ? `📅【${name}】${y}年${m}月` : `【${name}】${y}年${m}月`);
+  if(o.intro.trim()) out.push(o.intro.trim().replace(/\{月\}/g, m));
+  out.push('');
+  let n = 0;
+  for(let d = fromDay; d <= nd; d++){
+    const e = days[d]; if(!e) continue;
+    const head = `${m}/${d}（${WD[new Date(y,m-1,d).getDay()]}）`;
+    if(isFree(e)){ if(!e.text.trim()) continue; out.push(`${o.emoji ? '▶ ' : '・'}${head} ${e.text.trim().replace(/\n+/g,' ')}`); }
+    else if(e.off){ if(!o.off) continue; out.push(`${o.emoji ? '💤 ' : '・'}${head} ${e.place || 'お休み'}`); }
+    else out.push(`${o.emoji ? '▶ ' : '・'}${head} ${[timeStr(e), e.place].filter(Boolean).join(' ')}`);
+    n++;
+  }
+  if(!n) out.push('（予定はまだ入っていません）');
+  if(o.notes && state.notes.trim()){ out.push(''); out.push(state.notes.trim()); }
+  return out.join('\n');
+}
+function syncMsgForm(){
+  const o = msgOpts();
+  $('#msgIntro').value = o.intro;
+  $('#msgEmoji').checked = o.emoji; $('#msgOff').checked = o.off; $('#msgNotes').checked = o.notes; $('#msgFromToday').checked = o.fromToday;
+  $('#msgText').value = buildMessage();
+}
+function openMsg(){ $('#modal').hidden = true; syncMsgForm(); $('#msgModal').hidden = false; }
+$('#msgBtn').addEventListener('click', openMsg);
+$('#toMsg').addEventListener('click', openMsg);
+$('#closeMsg').addEventListener('click', () => { $('#msgModal').hidden = true; });
+$('#msgModal').addEventListener('click', ev => { if(ev.target.id === 'msgModal') $('#msgModal').hidden = true; });
+$('#msgModal').addEventListener('input', ev => {
+  const o = msgOpts(), id = ev.target.id;
+  if(id === 'msgText') return;
+  if(id === 'msgIntro') o.intro = ev.target.value;
+  else if(id === 'msgEmoji') o.emoji = ev.target.checked;
+  else if(id === 'msgOff') o.off = ev.target.checked;
+  else if(id === 'msgNotes') o.notes = ev.target.checked;
+  else if(id === 'msgFromToday') o.fromToday = ev.target.checked;
+  save(); $('#msgText').value = buildMessage();
+});
+$('#resetMsg').addEventListener('click', () => { $('#msgText').value = buildMessage(); toast('作り直しました'); });
+$('#copyMsg').addEventListener('click', async () => {
+  const ta = $('#msgText');
+  try{ await navigator.clipboard.writeText(ta.value); toast('コピーしました。LINEに貼り付けて送ってください'); }
+  catch(e){ ta.focus(); ta.select(); toast('文章を選択しました。コピーして使ってください'); }
+});
+$('#shareMsg').hidden = !navigator.share;
+$('#shareMsg').addEventListener('click', async () => {
+  try{ await navigator.share({text: $('#msgText').value}); }
+  catch(e){ if(e && e.name !== 'AbortError') toast('送れませんでした。「コピー」を使ってください'); }
 });
 
 /* ---------- backup ---------- */
