@@ -114,6 +114,37 @@ table.imp tr.skip td:not(:first-child){opacity:.4}
 .msgopts input{width:18px;height:18px;accent-color:var(--accent)}
 #msgText{font-size:14px;line-height:1.7}
 .msgopts label.sub:has(input:disabled){opacity:.45;cursor:default}
+/* action bar: the page-level actions, set apart from the editing controls */
+.actionbar{position:sticky;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:5;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 6px 6px 8px;box-shadow:0 6px 18px rgba(20,30,70,.10)}
+.actionbar svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.act{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:10px 18px;font-weight:700;font-size:14px;white-space:nowrap}
+.act.primary{background:var(--accent);color:var(--accent-ink)}
+.act.soft{background:var(--accent-soft);color:var(--ink)}
+.act:hover{filter:brightness(1.08)}
+.btn.ghost{display:inline-flex;align-items:center;gap:6px;background:transparent;border-color:transparent;color:var(--muted);border-radius:999px;padding:8px 12px}
+.btn.ghost:hover:not(:disabled){background:var(--surface-2);color:var(--ink)}
+@media (max-width:420px){.actionbar{border-radius:16px}.act{padding:9px 14px;font-size:13px}}
+.batch{display:flex;flex-direction:column;gap:8px;border-top:1px dashed var(--line);padding-top:12px}
+.batchlabel{font-size:12px;color:var(--muted);letter-spacing:.06em}
+.batch .btn{background:var(--surface-2);border-color:transparent}
+.batch .btn:hover{border-color:var(--accent)}
+/* collapsible panels */
+details.card.fold{display:block}
+.fold summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.fold summary::-webkit-details-marker{display:none}
+.fold summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
+.fold[open] summary::after{transform:rotate(-135deg)}
+.sumnote{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.foldbody{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+@media (prefers-reduced-motion:reduce){.fold summary::after{transition:none}}
+/* design by words */
+.designbox{display:flex;flex-direction:column;gap:6px}
+.inline{display:flex;gap:6px}
+.inline .btn{flex:none}
+.words summary{font-size:12px;color:var(--accent);cursor:pointer}
+#designWords{display:flex;flex-direction:column;gap:6px;margin-top:6px;font-size:12px;color:var(--muted)}
+#designWords b{color:var(--ink);font-weight:700;margin-right:4px}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;z-index:20;transition:opacity .2s}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 </style>
@@ -139,50 +170,77 @@ table.imp tr.skip td:not(:first-child){opacity:.4}
         </div>
         <div class="f">デザイン</div>
         <div class="themes" id="themes"></div>
-      </section>
-
-      <section class="card">
-        <h2>定例パターン</h2>
-        <p class="hint">よく使う「時間＋場所」を登録しておくと、カレンダーにワンタップで入れられます。</p>
-        <div id="presetList"></div>
-        <button class="btn" id="addPreset" type="button">＋ パターンを追加</button>
-      </section>
-
-      <section class="card">
-        <h2>下の注意書き</h2>
-        <textarea id="notes" rows="3"></textarea>
-        <p class="hint">1行ずつ表示されます。</p>
-      </section>
-
-      <section class="card">
-        <h2>バックアップ</h2>
-        <p class="hint">入力内容はこの端末に自動で保存されます。機種変更や別の端末に移すときは、バックアップファイルを書き出して、移した先で読み込んでください。</p>
-        <div class="row">
-          <button class="btn" id="backupOut" type="button">バックアップを書き出す</button>
-          <label class="btn" for="backupIn" style="cursor:pointer">バックアップを読み込む</label>
-          <input type="file" id="backupIn" accept=".json,application/json" hidden>
+        <div class="designbox">
+          <label class="f" for="designText">言葉でデザインを指定</label>
+          <div class="inline">
+            <input type="text" id="designText" placeholder="例：パステルピンクで桜っぽく">
+            <button class="btn" id="designApply" type="button">反映</button>
+          </div>
+          <p class="hint" id="designMsg"></p>
+          <details class="words">
+            <summary>使える言葉</summary>
+            <div id="designWords"></div>
+          </details>
         </div>
       </section>
+
+      <details class="card fold" data-fold="presets">
+        <summary><h2>定例パターン</h2><span class="sumnote" id="presetCount"></span></summary>
+        <div class="foldbody">
+          <p class="hint">よく使う「時間＋場所」を登録しておくと、カレンダーにワンタップで入れられます。</p>
+          <div id="presetList"></div>
+          <button class="btn" id="addPreset" type="button">＋ パターンを追加</button>
+        </div>
+      </details>
+
+      <details class="card fold" data-fold="notes">
+        <summary><h2>下の注意書き</h2><span class="sumnote" id="notesPeek"></span></summary>
+        <div class="foldbody">
+          <textarea id="notes" rows="3"></textarea>
+          <p class="hint">1行ずつ表示されます。</p>
+        </div>
+      </details>
+
+      <details class="card fold" data-fold="backup">
+        <summary><h2>バックアップ</h2></summary>
+        <div class="foldbody">
+          <p class="hint">入力内容はこの端末に自動で保存されます。機種変更や別の端末に移すときは、バックアップファイルを書き出して、移した先で読み込んでください。</p>
+          <div class="row">
+            <button class="btn" id="backupOut" type="button">バックアップを書き出す</button>
+            <label class="btn" for="backupIn" style="cursor:pointer">バックアップを読み込む</label>
+            <input type="file" id="backupIn" accept=".json,application/json" hidden>
+          </div>
+        </div>
+      </details>
     </aside>
 
     <section class="stage">
-      <div class="card">
-        <div class="row spread">
-          <h2>カレンダーに入れる</h2>
-          <div class="row">
-            <button class="btn" id="undo" type="button">元に戻す</button>
-            <button class="btn" id="msgBtn" type="button">配信文を作る</button>
-            <button class="btn primary" id="exportBtn" type="button">画像にする</button>
-          </div>
+      <div class="actionbar">
+        <button class="btn ghost" id="undo" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>元に戻す
+        </button>
+        <div class="acts">
+          <button class="act soft" id="msgBtn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>配信文を作る
+          </button>
+          <button class="act primary" id="exportBtn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>画像にする
+          </button>
         </div>
+      </div>
+      <div class="card">
+        <h2>カレンダーに入れる</h2>
         <div class="tools" id="tools"></div>
         <p class="hint" id="hint"></p>
         <div class="bulk" id="bulk"></div>
         <div class="editor" id="editor" hidden></div>
-        <div class="row">
-          <button class="btn" id="impBtn" type="button">文章から入れる</button>
-          <button class="btn" id="fillPrev" type="button">先月と同じ曜日で埋める</button>
-          <button class="btn warn" id="clearMonth" type="button">この月を空にする</button>
+        <div class="batch">
+          <span class="batchlabel">まとめて入力</span>
+          <div class="row">
+            <button class="btn" id="impBtn" type="button">文章から入れる</button>
+            <button class="btn" id="fillPrev" type="button">先月と同じ曜日で埋める</button>
+            <button class="btn warn" id="clearMonth" type="button">この月を空にする</button>
+          </div>
         </div>
       </div>
       <div class="poster">
@@ -364,10 +422,66 @@ function flake(ctx,x,y,r){
 }
 function cloud(ctx,x,y,s){ ctx.fillStyle = 'rgba(255,255,255,.92)'; [[0,0,22],[24,-10,26],[50,0,20],[26,8,22]].forEach(([a,b,c]) => { circle(ctx,x+a*s,y+b*s,c*s); ctx.fill(); }); }
 
+function shuttle(ctx,x,y,s,rot,alpha){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.scale(s,s); ctx.globalAlpha = alpha;
+  ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.strokeStyle = '#c9d3cc'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-9,-4); ctx.lineTo(-22,-44); ctx.quadraticCurveTo(0,-50,22,-44); ctx.lineTo(9,-4); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); for(let k=-2;k<=2;k++){ ctx.moveTo(k*3.5,-4); ctx.lineTo(k*10,-46); } ctx.stroke();
+  ctx.strokeStyle = '#8fb0a0'; ctx.beginPath(); ctx.moveTo(-13,-16); ctx.quadraticCurveTo(0,-19,13,-16); ctx.stroke();
+  ctx.fillStyle = '#f3ead8'; ctx.beginPath(); ctx.arc(0,-3,10,0,Math.PI); ctx.lineTo(-10,-4); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#d9483b'; ctx.fillRect(-10,-6,20,4);
+  ctx.restore();
+}
+function racket(ctx,x,y,s,rot){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.scale(s,s);
+  ctx.save(); ctx.beginPath(); ctx.ellipse(0,-58,34,46,0,0,Math.PI*2); ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1.2; ctx.beginPath();
+  for(let k=-34;k<=34;k+=7){ ctx.moveTo(k,-110); ctx.lineTo(k,-6); }
+  for(let k=-104;k<=-12;k+=7){ ctx.moveTo(-40,k); ctx.lineTo(40,k); }
+  ctx.stroke(); ctx.restore();
+  ctx.strokeStyle = '#e8453c'; ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(0,-58,34,46,0,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = '#d8dde0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(0,46); ctx.stroke();
+  ctx.fillStyle = '#26324d'; rr(ctx,-6,46,12,46,4); ctx.fill();
+  ctx.restore();
+}
+function pumpkin(ctx,x,y,r){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle = '#3f7a2a'; rr(ctx,-r*.08,-r*1.02,r*.16,r*.3,3); ctx.fill();
+  [[-.42,.62],[.42,.62],[0,.72]].forEach(([dx,rx]) => { ctx.fillStyle = dx ? '#e8781f' : '#f28c28'; ctx.beginPath(); ctx.ellipse(dx*r,0,rx*r,.82*r,0,0,Math.PI*2); ctx.fill(); });
+  ctx.fillStyle = '#3a1a00';
+  [-1,1].forEach(sd => { ctx.beginPath(); ctx.moveTo(sd*r*.34,-r*.28); ctx.lineTo(sd*r*.16,-r*.02); ctx.lineTo(sd*r*.52,-r*.02); ctx.closePath(); ctx.fill(); });
+  ctx.beginPath(); ctx.moveTo(-r*.5,r*.2);
+  [-.34,-.18,0,.18,.34,.5].forEach((t,i) => ctx.lineTo(t*r, r*(i%2 ? .2 : .36)));
+  ctx.lineTo(r*.3,r*.5); ctx.lineTo(-r*.3,r*.5); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function bat(ctx,x,y,s){
+  ctx.save(); ctx.translate(x,y); ctx.scale(s,s); ctx.fillStyle = '#120818';
+  ctx.beginPath(); ctx.moveTo(0,-4);
+  ctx.quadraticCurveTo(-10,-14,-30,-10); ctx.quadraticCurveTo(-24,-4,-26,4); ctx.quadraticCurveTo(-18,0,-14,6); ctx.quadraticCurveTo(-8,2,0,8);
+  ctx.quadraticCurveTo(8,2,14,6); ctx.quadraticCurveTo(18,0,26,4); ctx.quadraticCurveTo(24,-4,30,-10); ctx.quadraticCurveTo(10,-14,0,-4);
+  ctx.fill(); ctx.restore();
+}
+function tree(ctx,x,by,s){
+  ctx.save(); ctx.translate(x,by); ctx.scale(s,s);
+  ctx.fillStyle = '#6b4226'; ctx.fillRect(-9,-24,18,24);
+  [[0,-24,62,58],[0,-64,50,52],[0,-100,36,46]].forEach(([dx,y,hw,ht]) => { ctx.fillStyle = '#2f9e5a'; ctx.beginPath(); ctx.moveTo(dx-hw,y); ctx.lineTo(dx+hw,y); ctx.lineTo(dx,y-ht); ctx.closePath(); ctx.fill(); });
+  [[-30,-34,'#e63b2e'],[24,-40,'#ffd166'],[-14,-74,'#ffd166'],[18,-82,'#e63b2e'],[-6,-112,'#ffffff'],[34,-30,'#ffffff']].forEach(([a,b,col]) => { ctx.fillStyle = col; circle(ctx,a,b,5); ctx.fill(); });
+  ctx.fillStyle = '#ffd166'; ctx.beginPath();
+  for(let i=0;i<10;i++){ const a = -Math.PI/2 + i*Math.PI/5, d = i%2 ? 6 : 14; ctx.lineTo(Math.cos(a)*d, -150 + Math.sin(a)*d); }
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function gift(ctx,x,y,sz,box,ribbon){
+  ctx.fillStyle = box; rr(ctx,x-sz/2,y-sz/2,sz,sz,4); ctx.fill();
+  ctx.fillStyle = ribbon; ctx.fillRect(x-sz*.08,y-sz/2,sz*.16,sz); ctx.fillRect(x-sz/2,y-sz*.08,sz,sz*.16);
+  ctx.beginPath(); ctx.ellipse(x-sz*.16,y-sz/2-4,sz*.16,sz*.1,-.4,0,Math.PI*2); ctx.ellipse(x+sz*.16,y-sz/2-4,sz*.16,sz*.1,.4,0,Math.PI*2); ctx.fill();
+}
+
 /* ---------- themes ---------- */
 const THEMES = {
   moon:{ name:'お月見', bar:'#1b2a6b', ink:'#1b2a6b', plate:'#fbf5e3', month:'#ffffff', year:'#f3d36b', note:'#f4f6ff', shadow:'rgba(0,0,0,.25)',
-    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#0e1a45','#24407f'); c.fillRect(0,0,w,h); },
+    grad:['#0e1a45','#24407f'],
     back(c,w,h,mini){
       const r = rng(11), ox = mini ? (w-260)/2 : 0; c.fillStyle = '#fff4b8';
       for(let i=0;i<(mini?18:52);i++){ const x=r()*w, y=r()*h*.92, s=r(); if(s>.8) sparkle(c,x,y,4+s*5); else { c.globalAlpha=.45+s*.5; circle(c,x,y,1+s*1.6); c.fill(); c.globalAlpha=1; } }
@@ -379,7 +493,7 @@ const THEMES = {
     front(c,w,h){ susuki(c,w-14,h+4,210,-.4); susuki(c,w-40,h+4,150,-.12); susuki(c,w+4,h+4,140,-.65); }
   },
   momiji:{ name:'紅葉', bar:'#8a2d14', ink:'#7a2611', plate:'#fff7ec', month:'#fff3df', year:'#ffd166', note:'#fff6ee', shadow:'rgba(60,10,0,.35)',
-    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#6b2410','#bb4d1f'); c.fillRect(0,0,w,h); },
+    grad:['#6b2410','#bb4d1f'],
     back(c,w,h,mini){
       const r = rng(5), ox = mini ? (w-260)/2 : 0, cols = ['#e63b2e','#f28c28','#f6c343','#d2302a','#f5a742'];
       for(let i=0;i<(mini?12:34);i++) maple(c,r()*w,r()*h,8+r()*14,r()*6,cols[i%5]+'cc');
@@ -388,7 +502,7 @@ const THEMES = {
     front(c,w,h){ maple(c,w-56,70,34,.4,'#f6c343'); maple(c,w-24,206,30,-.6,'#e63b2e'); }
   },
   snow:{ name:'雪', bar:'#24427f', ink:'#1f3a72', plate:'#ffffff', month:'#ffffff', year:'#d6eaff', note:'#f2f7ff', shadow:'rgba(0,20,60,.35)',
-    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#1d3a76','#86b6e4'); c.fillRect(0,0,w,h); },
+    grad:['#1d3a76','#86b6e4'],
     back(c,w,h,mini){
       const r = rng(3), ox = mini ? (w-260)/2 : 0;
       c.fillStyle = 'rgba(255,255,255,.75)'; for(let i=0;i<(mini?24:80);i++){ circle(c,r()*w,r()*h,1+r()*2.4); c.fill(); }
@@ -404,7 +518,7 @@ const THEMES = {
     }
   },
   sakura:{ name:'桜', bar:'#c94f7c', ink:'#8f2c58', plate:'#ffffff', month:'#c23b6e', year:'#7b4a9e', note:'#fff4f8', shadow:'rgba(255,255,255,.9)',
-    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#ffd3e2','#ffeef4'); c.fillRect(0,0,w,h); },
+    grad:['#ffd3e2','#ffeef4'],
     back(c,w,h,mini){
       const r = rng(9), ox = mini ? (w-260)/2 : 0;
       c.fillStyle = 'rgba(238,128,168,.5)'; for(let i=0;i<(mini?14:42);i++){ c.beginPath(); c.ellipse(r()*w,r()*h,4+r()*4,7+r()*4,r()*6,0,Math.PI*2); c.fill(); }
@@ -416,7 +530,7 @@ const THEMES = {
     front(c,w,h){ flower(c,w-52,52,24,'#ff9ebb'); flower(c,w-18,96,18,'#ffc8d7'); }
   },
   summer:{ name:'夏', bar:'#0d74b5', ink:'#0b5f94', plate:'#ffffff', month:'#ffffff', year:'#fff27a', note:'#effaff', shadow:'rgba(0,60,110,.45)',
-    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#2fb0ec','#aee8ff'); c.fillRect(0,0,w,h); },
+    grad:['#2fb0ec','#aee8ff'],
     back(c,w,h,mini){
       const ox = mini ? (w-260)/2 : 0, x = ox+112, y = 86;
       c.save(); c.translate(x,y); c.fillStyle = '#ffd23f';
@@ -431,15 +545,52 @@ const THEMES = {
     }
   },
   simple:{ name:'シンプル', bar:'#22385e', ink:'#22385e', plate:'#f3f5f9', month:'#ffffff', year:'#f2c14e', note:'#f5f7fa', shadow:'rgba(0,0,0,.2)',
-    bg:(c,w,h) => { c.fillStyle = '#22385e'; c.fillRect(0,0,w,h); },
+    grad:['#22385e','#2b4572'],
     back(c,w,h,mini){
       const ox = mini ? (w-260)/2 : 0; c.strokeStyle = 'rgba(255,255,255,.1)'; c.lineWidth = 2;
       [[120,110,90],[120,110,130],[120,110,170]].forEach(([x,y,r]) => { circle(c,ox+x,y,r); c.stroke(); });
       c.fillStyle = '#f2c14e'; circle(c,ox+120,110,20); c.fill();
     }
+  },
+  badminton:{ name:'バドミントン', bar:'#0f5a43', ink:'#0c4a37', plate:'#ffffff', month:'#ffffff', year:'#ffe66d', note:'#effaf4', shadow:'rgba(0,40,25,.35)',
+    grad:['#0d6148','#3fae7a'],
+    back(c,w,h,mini){
+      const ox = mini ? (w-260)/2 : 0;
+      c.strokeStyle = 'rgba(255,255,255,.22)'; c.lineWidth = 4;
+      c.beginPath(); c.moveTo(0,h*.62); c.lineTo(w,h*.62); c.moveTo(w*.5,h*.62); c.lineTo(w*.5,h);
+      c.moveTo(0,h*.86); c.lineTo(w,h*.86); c.stroke();
+      const r = rng(21);
+      for(let i=0;i<(mini?3:8);i++) shuttle(c, r()*w, 20 + r()*h*.8, .55 + r()*.35, r()*6, .55);
+      racket(c, ox+92, 132, 1, -.5);
+      shuttle(c, ox+196, 118, 1.25, .5, 1);
+    },
+    front(c,w,h){ shuttle(c, w-60, 60, .9, -.7, 1); }
+  },
+  halloween:{ name:'ハロウィン', bar:'#4a1f66', ink:'#3d1757', plate:'#fff5e6', month:'#ffb347', year:'#ffe08a', note:'#fbf3ff', shadow:'rgba(20,0,30,.45)',
+    grad:['#1d0c30','#5e2780'],
+    back(c,w,h,mini){
+      const r = rng(31), ox = mini ? (w-260)/2 : 0;
+      c.fillStyle = '#ffe9a8'; for(let i=0;i<(mini?12:36);i++){ c.globalAlpha = .4 + r()*.6; circle(c, r()*w, r()*h*.8, 1 + r()*1.8); c.fill(); }
+      c.globalAlpha = 1;
+      c.fillStyle = '#fff3c4'; c.save(); c.shadowColor = 'rgba(255,230,150,.6)'; c.shadowBlur = 30; circle(c, ox+70, 64, 40); c.fill(); c.restore();
+      for(let i=0;i<(mini?2:6);i++) bat(c, r()*w, 20 + r()*h*.45, .7 + r()*.6);
+      pumpkin(c, ox+128, h-58, 56); pumpkin(c, ox+218, h-34, 32);
+    },
+    front(c,w,h){ pumpkin(c, w-46, h-30, 30); bat(c, w-120, 50, .9); }
+  },
+  christmas:{ name:'クリスマス', bar:'#b3261e', ink:'#8c1d18', plate:'#fffaf0', month:'#ffffff', year:'#ffd166', note:'#fff6f4', shadow:'rgba(0,30,15,.4)',
+    grad:['#0c3d25','#1f7a4a'],
+    back(c,w,h,mini){
+      const r = rng(41), ox = mini ? (w-260)/2 : 0;
+      c.fillStyle = 'rgba(255,255,255,.8)'; for(let i=0;i<(mini?20:70);i++){ circle(c, r()*w, r()*h, 1 + r()*2.2); c.fill(); }
+      tree(c, ox+120, h-10, 1);
+      gift(c, ox+190, h-44, 44, '#d23a32', '#ffd166'); gift(c, ox+238, h-34, 32, '#f4f1e8', '#2f9e5a');
+    },
+    front(c,w,h){ gift(c, w-70, h-40, 38, '#ffd166', '#d23a32'); }
   }
 };
-const THEME_ORDER = ['moon','momiji','snow','sakura','summer','simple'];
+Object.values(THEMES).forEach(t => { t.bg = (c,w,h) => { c.fillStyle = lin(c,h,t.grad[0],t.grad[1]); c.fillRect(0,0,w,h); }; });
+const THEME_ORDER = ['moon','momiji','snow','sakura','summer','badminton','halloween','christmas','simple'];
 
 function drawIcon(ctx,t,ix,iy,iw,ih,r){
   ctx.save(); rr(ctx,ix,iy,iw,ih,r); ctx.clip(); ctx.translate(ix,iy);
@@ -487,7 +638,7 @@ function setSpacing(c,v){ if('letterSpacing' in c) c.letterSpacing = v; }
 
 let layout = null;
 function draw(){
-  const {y,m} = state.cur, md = monthData(), t = THEMES[md.theme] || THEMES.moon;
+  const {y,m} = state.cur, md = monthData(), t = themeFor(md);
   const dow0 = new Date(y,m-1,1).getDay(), nd = new Date(y,m,0).getDate();
   const rows = Math.ceil((dow0+nd)/7);
   const headerH = 250, barY = 262, barH = 48, gridY = barY+barH, rowH = rows === 6 ? 158 : 184, gridH = rows*rowH;
@@ -726,6 +877,7 @@ function renderPresets(){
       <button type="button" class="btn warn del" aria-label="このパターンを削除">削除</button>
       <input type="text" data-k="place" list="places" value="${esc(p.place)}" placeholder="場所（例：勤労者体育館）" aria-label="場所">
     </div>`).join('') : '<p class="hint">まだパターンがありません。</p>';
+  if(typeof renderFoldNotes === 'function') renderFoldNotes();
 }
 $('#presetList').addEventListener('input', ev => {
   const row = ev.target.closest('.prow'), k = ev.target.dataset.k; if(!row || !k) return;
@@ -756,10 +908,11 @@ function renderBasics(){
   renderMonth();
 }
 function renderMonth(){
-  const {y,m} = state.cur;
+  const {y,m} = state.cur, md = monthData();
   $('#monthLabel').textContent = `${y}年${m}月`;
-  const cur = monthData().theme;
-  $('#themes').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.theme === cur));
+  $('#themes').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.theme === md.theme));
+  $('#designText').value = md.designText || '';
+  $('#designMsg').textContent = md.designText ? md.designNote || '' : '';
 }
 function buildThemes(){
   $('#themes').innerHTML = THEME_ORDER.map(id => `<button type="button" data-theme="${id}"><canvas width="240" height="120"></canvas>${THEMES[id].name}</button>`).join('');
@@ -767,10 +920,134 @@ function buildThemes(){
 }
 $('#themes').addEventListener('click', ev => {
   const b = ev.target.closest('[data-theme]'); if(!b) return;
-  monthData().theme = b.dataset.theme; save(); renderMonth(); scheduleDraw();
+  const md = monthData();
+  md.theme = b.dataset.theme; md.look = null; md.designText = ''; md.designNote = '';
+  save(); renderMonth(); scheduleDraw();
 });
+
+/* ---------- design by words ---------- */
+// 言葉の中から「絵柄」「色」「雰囲気」を探してデザインに反映する
+const MOTIF_WORDS = {
+  moon:['お月見','十五夜','月見','満月','お月さま','三日月','夜空','星空','星','夜'],
+  momiji:['紅葉','もみじ','モミジ','落ち葉','秋'],
+  snow:['雪だるま','雪','冬','スノー'],
+  sakura:['桜','さくら','サクラ','春','お花見','花'],
+  summer:['夏','海','波','太陽','ひまわり','サマー'],
+  badminton:['バドミントン','バド','シャトル','ラケット','スポーツ'],
+  halloween:['ハロウィン','ハロウィーン','かぼちゃ','カボチャ','おばけ','コウモリ'],
+  christmas:['クリスマス','サンタ','ツリー','プレゼント','Xmas'],
+  simple:['シンプル','無地','すっきり','スッキリ','ベーシック']
+};
+const COLOR_WORDS = {
+  pink:['ピンク','桃色','もも色','桜色','さくら色'],
+  red:['赤','レッド'],
+  orange:['オレンジ','橙'],
+  yellow:['黄色','イエロー','金色','ゴールド'],
+  green:['緑','グリーン','みどり','抹茶','若葉'],
+  sky:['水色','空色','ライトブルー','スカイブルー','ミント'],
+  blue:['青','ブルー'],
+  navy:['紺','ネイビー','藍'],
+  purple:['紫','パープル','ラベンダー','むらさき'],
+  brown:['茶色','ブラウン','チョコ'],
+  black:['黒','ブラック'],
+  white:['白','ホワイト'],
+  gray:['グレー','灰色','グレイ']
+};
+const MOOD_WORDS = {
+  soft:['パステル','かわいい','可愛い','カワイイ','やさしい','優しい','淡い','ふんわり','明るい','ポップ'],
+  dark:['かっこいい','カッコいい','かっこよく','カッコよく','格好いい','クール','シック','大人','落ち着いた','渋い','暗め','ダーク','濃い']
+};
+const COLOR_PALS = {
+  pink:  {grad:['#f06b9a','#ffc2d6'], bar:'#c94f7c', ink:'#8f2c58', plate:'#ffffff', month:'#ffffff', year:'#fff2b3', note:'#fff4f8'},
+  red:   {grad:['#8c1d18','#d9453b'], bar:'#b3261e', ink:'#8c1d18', plate:'#fff7f5', month:'#ffffff', year:'#ffd166', note:'#fff4f2'},
+  orange:{grad:['#d9661a','#ffb54d'], bar:'#c4580f', ink:'#8a3e0a', plate:'#fffaf2', month:'#ffffff', year:'#fff3c4', note:'#fff6ec'},
+  yellow:{grad:['#f2b400','#ffe680'], bar:'#a87800', ink:'#6e4f00', plate:'#ffffff', month:'#ffffff', year:'#7a4a00', note:'#fffbea'},
+  green: {grad:['#1f6b43','#6cc08a'], bar:'#2e7d4f', ink:'#1f5a38', plate:'#f6fff8', month:'#ffffff', year:'#f3f9c4', note:'#f1faf3'},
+  sky:   {grad:['#3aaee8','#bfeafc'], bar:'#1d86c4', ink:'#0b5f94', plate:'#ffffff', month:'#ffffff', year:'#fff27a', note:'#effaff'},
+  blue:  {grad:['#173f88','#4f86e8'], bar:'#1f56b8', ink:'#173f88', plate:'#ffffff', month:'#ffffff', year:'#cfe1ff', note:'#f0f5ff'},
+  navy:  {grad:['#0e1a45','#24407f'], bar:'#1b2a6b', ink:'#1b2a6b', plate:'#fbf5e3', month:'#ffffff', year:'#f3d36b', note:'#f4f6ff'},
+  purple:{grad:['#4a2378','#9b6fd0'], bar:'#6b3fa0', ink:'#4f2d78', plate:'#fbf7ff', month:'#ffffff', year:'#ffe08a', note:'#f7f2ff'},
+  brown: {grad:['#4e3322','#9c6b45'], bar:'#6d4c33', ink:'#523825', plate:'#fff8ef', month:'#fff3df', year:'#ffd8a0', note:'#fbf5ee'},
+  black: {grad:['#0e0f12','#34363d'], bar:'#1f2126', ink:'#1a1b1f', plate:'#f4f4f5', month:'#ffffff', year:'#f2c14e', note:'#f5f5f6'},
+  white: {grad:['#ffffff','#e9edf5'], bar:'#4a5578', ink:'#2c3552', plate:'#eef1f8', month:'#2c3552', year:'#8a6d1d', note:'#f6f7fb', shadow:'rgba(255,255,255,.9)'},
+  gray:  {grad:['#4b515c','#9aa1ad'], bar:'#4b515c', ink:'#323741', plate:'#f5f6f8', month:'#ffffff', year:'#ffe08a', note:'#f5f6f8'}
+};
+const COLOR_NAMES = {pink:'ピンク', red:'赤', orange:'オレンジ', yellow:'黄色', green:'緑', sky:'水色', blue:'青', navy:'紺', purple:'紫', brown:'茶色', black:'黒', white:'白', gray:'グレー'};
+const MOOD_NAMES = {soft:'やわらかく明るく', dark:'落ち着いた濃い色'};
+function mixHex(a, b, t){
+  const pa = parseInt(a.slice(1),16), pb = parseInt(b.slice(1),16);
+  const ch = sh => Math.round(((pa>>sh)&255)*(1-t) + ((pb>>sh)&255)*t);
+  return '#' + [16,8,0].map(sh => ch(sh).toString(16).padStart(2,'0')).join('');
+}
+function findWord(text, table){
+  let best = null;
+  Object.entries(table).forEach(([id, words]) => words.forEach(wd => {
+    const i = text.indexOf(wd);
+    if(i >= 0 && (!best || i < best.i || (i === best.i && wd.length > best.wd.length))) best = {id, wd, i};
+  }));
+  return best;
+}
+function themeFor(md){
+  const base = THEMES[md.theme] || THEMES.moon;
+  if(!md.look) return base;
+  const t = Object.assign({}, base, md.look.pal), g = md.look.grad;
+  t.bg = (c,w,h) => { c.fillStyle = lin(c,h,g[0],g[1]); c.fillRect(0,0,w,h); };
+  return t;
+}
+function applyDesignText(text){
+  const md = monthData(), raw = text.trim();
+  if(!raw){ md.look = null; md.designText = ''; md.designNote = ''; save(); renderMonth(); scheduleDraw(); return; }
+  const motif = findWord(raw, MOTIF_WORDS);
+  // 絵柄の言葉の中にある文字（例：バドミントン の「ミント」）は色として読まない
+  const rest = motif ? raw.slice(0, motif.i) + '　'.repeat(motif.wd.length) + raw.slice(motif.i + motif.wd.length) : raw;
+  const color = findWord(rest, COLOR_WORDS), mood = findWord(rest, MOOD_WORDS);
+  if(!motif && !color && !mood){
+    $('#designMsg').textContent = 'わかる言葉が見つかりませんでした。「使える言葉」から選んで書いてみてください。';
+    return;
+  }
+  if(motif) md.theme = motif.id;
+  const base = THEMES[md.theme];
+  if(color || mood){
+    const src = color ? COLOR_PALS[color.id] : base;
+    const pal = {bar:src.bar, ink:src.ink, plate:src.plate, month:src.month, year:src.year, note:src.note, shadow:src.shadow || 'rgba(0,0,0,.3)'};
+    let grad = src.grad.slice();
+    if(mood && mood.id === 'soft'){
+      grad = grad.map(c => mixHex(c,'#ffffff',.55));
+      Object.assign(pal, {month:pal.ink, year:pal.bar, plate:'#ffffff', shadow:'rgba(255,255,255,.9)'});
+    }
+    if(mood && mood.id === 'dark'){
+      grad = grad.map(c => mixHex(c,'#000000',.4));
+      Object.assign(pal, {month:'#ffffff', shadow:'rgba(0,0,0,.4)', bar:mixHex(pal.bar,'#000000',.25), ink:mixHex(pal.ink,'#000000',.2)});
+    }
+    md.look = {pal, grad};
+  } else md.look = null;
+  const parts = [`絵柄：${base.name}${motif ? '' : '（今のまま）'}`];
+  if(color) parts.push(`色：${COLOR_NAMES[color.id]}`);
+  if(mood) parts.push(`雰囲気：${MOOD_NAMES[mood.id]}`);
+  md.designText = raw; md.designNote = '反映しました → ' + parts.join('／');
+  save(); renderMonth(); scheduleDraw();
+}
+$('#designApply').addEventListener('click', () => applyDesignText($('#designText').value));
+$('#designText').addEventListener('keydown', ev => { if(ev.key === 'Enter' && !ev.isComposing){ ev.preventDefault(); applyDesignText(ev.target.value); } });
+$('#designWords').innerHTML = [
+  ['絵柄', Object.values(MOTIF_WORDS).map(ws => ws[0])],
+  ['色', Object.values(COLOR_WORDS).map(ws => ws[0]).concat(['パステル○○'])],
+  ['雰囲気', ['かわいい','やさしい','ポップ','かっこいい','シック','落ち着いた']]
+].map(([k, ws]) => `<div><b>${k}</b>${ws.join('・')}</div>`).join('') + '<div>例：「パステルピンクで桜っぽく」「バドミントンで青、かっこよく」「ハロウィン」</div>';
+
+/* ---------- collapsible panels ---------- */
+const FOLD_KEY = 'renshu-nittei-folds';
+let folds = {}; try{ folds = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}'); }catch(e){}
+document.querySelectorAll('details.fold').forEach(d => {
+  d.open = !!folds[d.dataset.fold];
+  d.addEventListener('toggle', () => { folds[d.dataset.fold] = d.open; try{ localStorage.setItem(FOLD_KEY, JSON.stringify(folds)); }catch(e){} });
+});
+function renderFoldNotes(){
+  $('#presetCount').textContent = `${state.presets.length}件`;
+  $('#notesPeek').textContent = (state.notes.split('\n').find(l => l.trim()) || '').trim();
+}
 $('#title').addEventListener('input', ev => { state.title = ev.target.value; save(); scheduleDraw(); });
-$('#notes').addEventListener('input', ev => { state.notes = ev.target.value; save(); scheduleDraw(); });
+$('#notes').addEventListener('input', ev => { state.notes = ev.target.value; save(); scheduleDraw(); renderFoldNotes(); });
 function shiftMonth(n){
   let {y,m} = state.cur; m += n; if(m < 1){ m = 12; y--; } if(m > 12){ m = 1; y++; }
   state.cur = {y,m}; selDay = null; save(); renderMonth(); renderTools(); renderEditor(); scheduleDraw();

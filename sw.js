@@ -1,5 +1,5 @@
 // アプリを更新したら VERSION の数字を上げると、各端末に新しい版が配られます
-const VERSION = 'v5';
+const VERSION = 'v6';
 const APP = 'nittei-app-' + VERSION;
 const FONTS = 'nittei-fonts';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
