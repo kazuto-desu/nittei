@@ -1,0 +1,16 @@
+{
+  "name": "練習日程表メーカー",
+  "short_name": "日程表",
+  "description": "定例パターンを選んで日付をタップするだけで、月間の練習日程表を画像にできるアプリ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eceff6",
+  "theme_color": "#24358a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>練習日程表メーカー</title>
+<meta name="theme-color" content="#24358a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="日程表">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+/* Layout: editing panel on the left, live poster on the right; poster first on phones */
+:root{
+  --bg:#eceff6; --surface:#ffffff; --surface-2:#f5f6fb; --ink:#1b2340; --muted:#5b6380; --line:#d8dcea;
+  --accent:#24358a; --accent-ink:#ffffff; --accent-soft:#e2e6f8; --gold:#c9951a; --danger:#cf3a31;
+  --display:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
+  --body:"Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --poster-hover:rgba(36,53,138,.10); --poster-ring:rgba(36,53,138,.45); --poster-sel:#e0a81e;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f121b; --surface:#181c29; --surface-2:#1f2434; --ink:#e7e9f3; --muted:#9ba2bc; --line:#2d3348;
+  --accent:#93a5ff; --accent-ink:#10142a; --accent-soft:#252c4a; --gold:#e8bd4c; --danger:#ff6f64; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f121b; --surface:#181c29; --surface-2:#1f2434; --ink:#e7e9f3; --muted:#9ba2bc; --line:#2d3348;
+  --accent:#93a5ff; --accent-ink:#10142a; --accent-soft:#252c4a; --gold:#e8bd4c; --danger:#ff6f64; color-scheme:dark}
+*{box-sizing:border-box}
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{margin:0;-webkit-text-size-adjust:100%;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.6}
+.app{max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:20px 56px;display:flex;flex-direction:column;gap:18px}
+.top h1{font-family:var(--display);font-weight:900;font-size:26px;margin:0;letter-spacing:.04em;text-wrap:balance}
+.top p{margin:2px 0 0;color:var(--muted)}
+.layout{display:grid;grid-template-columns:minmax(300px,370px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:880px){.layout{grid-template-columns:minmax(0,1fr)}.stage{order:-1}}
+.panel,.stage{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h2{font-family:var(--display);font-size:16px;font-weight:700;margin:0;letter-spacing:.03em}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.spread{justify-content:space-between}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);letter-spacing:.04em}
+input[type=text],select,textarea{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+textarea{resize:vertical;line-height:1.7}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;color:var(--ink);cursor:pointer}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:7px 12px;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;padding:9px 16px}
+.btn.warn{color:var(--danger)}
+.btn:disabled{opacity:.45;cursor:default}
+.hint{margin:0;color:var(--muted);font-size:12.5px}
+.monthnav{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}
+.monthnav strong{text-align:center;font-family:var(--display);font-size:20px;font-variant-numeric:tabular-nums}
+.themes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.themes button{border:2px solid transparent;background:var(--surface-2);border-radius:10px;padding:4px 4px 6px;display:flex;flex-direction:column;gap:4px;align-items:center;font-size:12px}
+.themes button canvas{width:100%;aspect-ratio:2/1;border-radius:7px;display:block}
+.themes button[aria-pressed="true"]{border-color:var(--accent);font-weight:700}
+.tools{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 11px;text-align:left;font-size:12.5px;line-height:1.35}
+.chip .t{font-weight:700;font-variant-numeric:tabular-nums;display:block}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chip.off .t{color:var(--danger)}
+.chip.off[aria-pressed="true"] .t{color:var(--accent-ink)}
+.chip.edit{border-style:dashed}
+.bulk{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.bulk button{width:34px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);font-weight:700}
+.bulk button:hover{border-color:var(--accent)}
+.editor{background:var(--accent-soft);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.editor strong{font-family:var(--display);font-size:17px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:6px 14px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.grid3{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3 .wide{grid-column:1/-1}
+.prow{display:grid;grid-template-columns:1fr auto 1fr auto;gap:6px;align-items:center;padding-block:8px;border-top:1px solid var(--line)}
+.prow:first-child{border-top:0;padding-top:0}
+.prow input{grid-column:1/4}
+.prow .del{grid-row:2;grid-column:4}
+.poster{position:relative;max-width:760px;width:100%;margin-inline:auto;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(20,30,70,.18);background:#ffffff}
+.poster canvas{width:100%;display:block}
+.overlay{position:absolute;inset:0}
+.cellbtn{position:absolute;background:transparent;border:0;border-radius:3px;padding:0}
+.cellbtn:hover{background:var(--poster-hover);box-shadow:inset 0 0 0 2px var(--poster-ring)}
+.cellbtn.sel{box-shadow:inset 0 0 0 4px var(--poster-sel)}
+.cellbtn:focus-visible{outline:3px solid var(--poster-ring);outline-offset:-3px}
+.modal{position:fixed;inset:0;background:rgba(10,14,30,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.modal .box{background:var(--surface);border-radius:16px;padding:16px;max-width:560px;width:100%;max-height:92%;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.modal img{width:100%;border-radius:10px;border:1px solid var(--line)}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;z-index:20;transition:opacity .2s}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>練習日程表メーカー</h1>
+    <p>パターンを選んで日付をタップするだけ。できあがったら画像にしてLINEやSNSで共有できます。</p>
+  </header>
+
+  <div class="layout">
+    <aside class="panel">
+      <section class="card">
+        <h2>基本設定</h2>
+        <label class="f" for="title">タイトル
+          <input type="text" id="title" maxlength="24">
+        </label>
+        <div class="monthnav">
+          <button class="btn" id="prevM" type="button">‹ 前の月</button>
+          <strong id="monthLabel"></strong>
+          <button class="btn" id="nextM" type="button">次の月 ›</button>
+        </div>
+        <div class="f">デザイン</div>
+        <div class="themes" id="themes"></div>
+      </section>
+
+      <section class="card">
+        <h2>定例パターン</h2>
+        <p class="hint">よく使う「時間＋場所」を登録しておくと、カレンダーにワンタップで入れられます。</p>
+        <div id="presetList"></div>
+        <button class="btn" id="addPreset" type="button">＋ パターンを追加</button>
+      </section>
+
+      <section class="card">
+        <h2>下の注意書き</h2>
+        <textarea id="notes" rows="3"></textarea>
+        <p class="hint">1行ずつ表示されます。</p>
+      </section>
+
+      <section class="card">
+        <h2>バックアップ</h2>
+        <p class="hint">入力内容はこの端末に自動で保存されます。機種変更や別の端末に移すときは、バックアップファイルを書き出して、移した先で読み込んでください。</p>
+        <div class="row">
+          <button class="btn" id="backupOut" type="button">バックアップを書き出す</button>
+          <label class="btn" for="backupIn" style="cursor:pointer">バックアップを読み込む</label>
+          <input type="file" id="backupIn" accept=".json,application/json" hidden>
+        </div>
+      </section>
+    </aside>
+
+    <section class="stage">
+      <div class="card">
+        <div class="row spread">
+          <h2>カレンダーに入れる</h2>
+          <div class="row">
+            <button class="btn" id="undo" type="button">元に戻す</button>
+            <button class="btn primary" id="exportBtn" type="button">画像にする</button>
+          </div>
+        </div>
+        <div class="tools" id="tools"></div>
+        <p class="hint" id="hint"></p>
+        <div class="bulk" id="bulk"></div>
+        <div class="editor" id="editor" hidden></div>
+        <div class="row">
+          <button class="btn" id="fillPrev" type="button">先月と同じ曜日で埋める</button>
+          <button class="btn warn" id="clearMonth" type="button">この月を空にする</button>
+        </div>
+      </div>
+      <div class="poster">
+        <canvas id="poster" aria-label="日程表のプレビュー"></canvas>
+        <div class="overlay" id="overlay"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<datalist id="places"></datalist>
+
+<div class="modal" id="modal" hidden>
+  <div class="box">
+    <div class="row spread"><h2 style="margin:0;font-family:var(--display)">画像ができました</h2><button class="btn" id="closeModal" type="button">閉じる</button></div>
+    <img id="outImg" alt="完成した日程表の画像">
+    <div class="row">
+      <button class="btn primary" id="shareImg" type="button" hidden>LINEなどで共有</button>
+      <button class="btn" id="saveImg" type="button">画像を保存</button>
+      <button class="btn" id="copyImg" type="button">画像をコピー</button>
+    </div>
+    <p class="hint">保存できないときは、画像を長押し（スマホ）または右クリック（PC）して保存してください。</p>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const WD = ['日','月','火','水','木','金','土'];
+const STORE = 'renshu-nittei-v1';
+const FONT = '"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif';
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+/* ---------- data ---------- */
+function seed(){
+  const P = (s,e,place) => ({id:uid(), s, e, place});
+  const presets = [P('17:00','19:00','勤労者体育館'), P('19:00','22:00','安岐体育館'), P('19:00','22:00','安岐中央体育館'), P('9:00','15:00','安岐体育館'), P('9:00','15:00','安岐中央体育館')];
+  const E = (s,e,place) => ({s,e,place});
+  const kin = () => E('17:00','19:00','勤労者体育館');
+  return {
+    title:'ニポポ練習日程表',
+    presets,
+    notes:'※ 都合により予定が変更になる場合があります。\n※ 体調管理・ケガに気をつけて、練習に参加しましょう！',
+    cur:{y:2026, m:10},
+    months:{'2026-10':{theme:'moon', days:{
+      3:E('9:00','15:00','安岐体育館'), 6:kin(), 7:{off:true, place:''}, 10:E('9:00','15:00','安岐中央体育館'),
+      13:kin(), 14:E('19:00','22:00','安岐体育館'), 17:E('9:00','15:00','安岐体育館'),
+      20:kin(), 21:E('19:00','22:00','安岐中央体育館'), 24:E('9:00','15:00','安岐体育館'),
+      27:kin(), 28:E('19:00','22:00','安岐中央体育館'), 31:E('9:00','15:00','安岐体育館')}}}
+  };
+}
+function load(){ try{ const t = localStorage.getItem(STORE); return t ? JSON.parse(t) : null; }catch(e){ return null; } }
+let saveTimer;
+function save(){ clearTimeout(saveTimer); saveTimer = setTimeout(() => { try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }, 200); }
+let state = load() || seed();
+
+const keyOf = (y,m) => `${y}-${String(m).padStart(2,'0')}`;
+const seasonTheme = m => [0,'snow','snow','sakura','sakura','sakura','summer','summer','summer','moon','moon','momiji','snow'][m];
+function monthData(y = state.cur.y, m = state.cur.m){
+  const k = keyOf(y,m);
+  if(!state.months[k]) state.months[k] = {theme: seasonTheme(m), days:{}};
+  return state.months[k];
+}
+const fmt = t => { if(!t) return ''; const [h,mm] = t.split(':').map(Number); return h + '時' + (mm===0 ? '' : mm===30 ? '半' : mm + '分'); };
+const timeStr = e => e.s && e.e ? `${fmt(e.s)}〜${fmt(e.e)}` : e.s ? `${fmt(e.s)}〜` : '';
+const sig = e => JSON.stringify([!!e.off, e.s||'', e.e||'', e.place||'']);
+const TIMES = []; for(let h=5; h<=23; h++){ TIMES.push(h+':00'); if(h<23) TIMES.push(h+':30'); }
+const timeOpts = v => `<option value=""${!v?' selected':''}>なし</option>` + TIMES.map(t => `<option value="${t}"${t===v?' selected':''}>${fmt(t)}</option>`).join('');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- drawing helpers ---------- */
+function rr(ctx,x,y,w,h,r){
+  const R = Array.isArray(r) ? r : [r,r,r,r];
+  ctx.beginPath();
+  ctx.moveTo(x+R[0],y); ctx.lineTo(x+w-R[1],y); ctx.quadraticCurveTo(x+w,y,x+w,y+R[1]);
+  ctx.lineTo(x+w,y+h-R[2]); ctx.quadraticCurveTo(x+w,y+h,x+w-R[2],y+h);
+  ctx.lineTo(x+R[3],y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-R[3]);
+  ctx.lineTo(x,y+R[0]); ctx.quadraticCurveTo(x,y,x+R[0],y); ctx.closePath();
+}
+function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed>>>15, 1|seed); t = t + Math.imul(t ^ t>>>7, 61|t) ^ t; return ((t ^ t>>>14) >>> 0) / 4294967296; }; }
+function lin(ctx,h,a,b){ const g = ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,a); g.addColorStop(1,b); return g; }
+function sparkle(ctx,x,y,s){ ctx.beginPath(); ctx.moveTo(x,y-s); ctx.quadraticCurveTo(x,y,x+s,y); ctx.quadraticCurveTo(x,y,x,y+s); ctx.quadraticCurveTo(x,y,x-s,y); ctx.quadraticCurveTo(x,y,x,y-s); ctx.fill(); }
+function circle(ctx,x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); }
+
+function moon(ctx,x,y,r){
+  ctx.save(); ctx.shadowColor = 'rgba(255,236,140,.75)'; ctx.shadowBlur = 42;
+  const g = ctx.createRadialGradient(x-r*.3,y-r*.3,r*.1,x,y,r); g.addColorStop(0,'#fff9cf'); g.addColorStop(1,'#f4cc4f');
+  ctx.fillStyle = g; circle(ctx,x,y,r); ctx.fill(); ctx.restore();
+  ctx.fillStyle = 'rgba(226,176,58,.35)';
+  [[-.36,-.2,.2,.14],[.26,-.4,.14,.11],[.3,.16,.22,.17],[-.14,.4,.17,.12],[-.5,.22,.11,.08]].forEach(([a,b,c,d]) => { ctx.beginPath(); ctx.ellipse(x+a*r,y+b*r,c*r,d*r,.3,0,Math.PI*2); ctx.fill(); });
+}
+function susuki(ctx,x,y,len,lean){
+  const tx = x+lean*len, ty = y-len, cx = x+lean*len*.15, cy = y-len*.65, sgn = lean<0?-1:1;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(124,156,92,.95)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x,y); ctx.quadraticCurveTo(x+sgn*30, y-len*.4, x+lean*len*.6+sgn*44, y-len*.3); ctx.stroke();
+  ctx.strokeStyle = '#cdbd92'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(x,y); ctx.quadraticCurveTo(cx,cy,tx,ty); ctx.stroke();
+  ctx.strokeStyle = 'rgba(246,236,212,.95)'; ctx.lineWidth = 1.6;
+  for(let t=.5; t<=1.001; t+=.022){
+    const u = 1-t;
+    const px = u*u*x + 2*u*t*cx + t*t*tx, py = u*u*y + 2*u*t*cy + t*t*ty;
+    const dx = 2*u*(cx-x) + 2*t*(tx-cx), dy = 2*u*(cy-y) + 2*t*(ty-cy);
+    const a = Math.atan2(dy,dx), L = 8 + 24*Math.sin((t-.5)/.5*Math.PI*.9);
+    [-.5,.5].forEach(o => { const b = a+Math.PI+o; ctx.beginPath(); ctx.moveTo(px,py); ctx.quadraticCurveTo(px+Math.cos(b)*L*.5+o*4, py+Math.sin(b)*L*.5, px+Math.cos(b)*L, py+Math.sin(b)*L+4); ctx.stroke(); });
+  }
+}
+function dango(ctx,cx,by,s){
+  ctx.save(); ctx.translate(cx,by); ctx.scale(s,s);
+  ctx.fillStyle = '#b8793a'; ctx.beginPath(); ctx.moveTo(-40,0); ctx.lineTo(40,0); ctx.lineTo(34,-26); ctx.lineTo(-34,-26); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#5b3818'; ctx.beginPath(); ctx.ellipse(0,-12,8,6,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#d9a061'; rr(ctx,-48,-36,96,11,3); ctx.fill();
+  const R = 15;
+  [[[0,-101]],[[-14.5,-75.5],[14.5,-75.5]],[[-29,-50],[0,-50],[29,-50]]].forEach(row => row.forEach(([x,y]) => {
+    ctx.fillStyle = '#fffdf4'; ctx.strokeStyle = '#d6cdb5'; ctx.lineWidth = 2; circle(ctx,x,y,R); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; circle(ctx,x-5,y-5,3.5); ctx.fill();
+  }));
+  ctx.restore();
+}
+function flower(ctx,x,y,r,col){
+  ctx.save(); ctx.translate(x,y); ctx.fillStyle = col;
+  for(let k=0;k<5;k++){ ctx.rotate(Math.PI*2/5); ctx.beginPath(); ctx.ellipse(0,-r*.52,r*.42,r*.56,0,0,Math.PI*2); ctx.fill(); }
+  ctx.fillStyle = '#e8638f'; circle(ctx,0,0,r*.22); ctx.fill();
+  ctx.fillStyle = '#f9d65c'; for(let k=0;k<5;k++){ const a = k*Math.PI*2/5; circle(ctx,Math.cos(a)*r*.3,Math.sin(a)*r*.3,r*.07); ctx.fill(); }
+  ctx.restore();
+}
+function maple(ctx,x,y,r,rot,col){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.fillStyle = col; ctx.strokeStyle = col;
+  ctx.beginPath();
+  const outer = [1,.95,.6,.6,.95];
+  for(let i=0;i<10;i++){ const a = -Math.PI/2 + i*Math.PI/5; const d = i%2 ? r*.38 : r*outer[i/2]; ctx[i?'lineTo':'moveTo'](Math.cos(a)*d, Math.sin(a)*d); }
+  ctx.closePath(); ctx.fill();
+  ctx.lineWidth = Math.max(1.5, r*.08); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,r*.95); ctx.stroke();
+  ctx.restore();
+}
+function flake(ctx,x,y,r){
+  ctx.save(); ctx.translate(x,y); ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = Math.max(1.2, r*.12); ctx.lineCap = 'round';
+  for(let k=0;k<6;k++){ ctx.rotate(Math.PI/3); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-r); ctx.moveTo(0,-r*.55); ctx.lineTo(-r*.25,-r*.78); ctx.moveTo(0,-r*.55); ctx.lineTo(r*.25,-r*.78); ctx.stroke(); }
+  ctx.restore();
+}
+function cloud(ctx,x,y,s){ ctx.fillStyle = 'rgba(255,255,255,.92)'; [[0,0,22],[24,-10,26],[50,0,20],[26,8,22]].forEach(([a,b,c]) => { circle(ctx,x+a*s,y+b*s,c*s); ctx.fill(); }); }
+
+/* ---------- themes ---------- */
+const THEMES = {
+  moon:{ name:'お月見', bar:'#1b2a6b', ink:'#1b2a6b', plate:'#fbf5e3', month:'#ffffff', year:'#f3d36b', note:'#f4f6ff', shadow:'rgba(0,0,0,.25)',
+    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#0e1a45','#24407f'); c.fillRect(0,0,w,h); },
+    back(c,w,h,mini){
+      const r = rng(11), ox = mini ? (w-260)/2 : 0; c.fillStyle = '#fff4b8';
+      for(let i=0;i<(mini?18:52);i++){ const x=r()*w, y=r()*h*.92, s=r(); if(s>.8) sparkle(c,x,y,4+s*5); else { c.globalAlpha=.45+s*.5; circle(c,x,y,1+s*1.6); c.fill(); c.globalAlpha=1; } }
+      if(!mini){ c.fillStyle='rgba(255,255,255,.16)'; [[600,34,120],[650,52,70],[860,26,90],[900,44,150]].forEach(([x,y,l]) => { rr(c,x,y,l,9,5); c.fill(); }); }
+      moon(c,ox+118,92,70);
+      susuki(c,ox+4,h+4,200,.42); susuki(c,ox+26,h+4,150,.12); susuki(c,ox-10,h+4,130,.7);
+      dango(c,ox+168,h-8,1);
+    },
+    front(c,w,h){ susuki(c,w-14,h+4,210,-.4); susuki(c,w-40,h+4,150,-.12); susuki(c,w+4,h+4,140,-.65); }
+  },
+  momiji:{ name:'紅葉', bar:'#8a2d14', ink:'#7a2611', plate:'#fff7ec', month:'#fff3df', year:'#ffd166', note:'#fff6ee', shadow:'rgba(60,10,0,.35)',
+    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#6b2410','#bb4d1f'); c.fillRect(0,0,w,h); },
+    back(c,w,h,mini){
+      const r = rng(5), ox = mini ? (w-260)/2 : 0, cols = ['#e63b2e','#f28c28','#f6c343','#d2302a','#f5a742'];
+      for(let i=0;i<(mini?12:34);i++) maple(c,r()*w,r()*h,8+r()*14,r()*6,cols[i%5]+'cc');
+      [[70,72,44,.2,0],[170,120,36,-.5,1],[96,178,32,.7,2],[212,52,28,-.2,4],[30,150,26,.9,3]].forEach(([x,y,s,a,k]) => maple(c,ox+x,y,s,a,cols[k]));
+    },
+    front(c,w,h){ maple(c,w-56,70,34,.4,'#f6c343'); maple(c,w-24,206,30,-.6,'#e63b2e'); }
+  },
+  snow:{ name:'雪', bar:'#24427f', ink:'#1f3a72', plate:'#ffffff', month:'#ffffff', year:'#d6eaff', note:'#f2f7ff', shadow:'rgba(0,20,60,.35)',
+    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#1d3a76','#86b6e4'); c.fillRect(0,0,w,h); },
+    back(c,w,h,mini){
+      const r = rng(3), ox = mini ? (w-260)/2 : 0;
+      c.fillStyle = 'rgba(255,255,255,.75)'; for(let i=0;i<(mini?24:80);i++){ circle(c,r()*w,r()*h,1+r()*2.4); c.fill(); }
+      for(let i=0;i<(mini?5:14);i++) flake(c,r()*w,r()*h*.8,7+r()*12);
+      c.fillStyle = '#f4f9ff'; c.beginPath(); c.moveTo(0,h); c.lineTo(0,h-34); c.bezierCurveTo(w*.25,h-60,w*.5,h-14,w*.75,h-40); c.bezierCurveTo(w*.88,h-54,w,h-30,w,h-30); c.lineTo(w,h); c.fill();
+      const x = ox+130;
+      c.fillStyle = '#ffffff'; c.strokeStyle = '#c4d6ee'; c.lineWidth = 2;
+      circle(c,x,h-52,42); c.fill(); c.stroke(); circle(c,x,h-114,29); c.fill(); c.stroke();
+      c.fillStyle = '#d0453a'; rr(c,x-30,h-92,60,10,5); c.fill(); rr(c,x+8,h-92,11,30,4); c.fill();
+      c.beginPath(); c.moveTo(x-20,h-136); c.lineTo(x+20,h-136); c.lineTo(x+15,h-160); c.lineTo(x-15,h-160); c.closePath(); c.fill();
+      c.fillStyle = '#26324d'; circle(c,x-10,h-118,3.2); c.fill(); circle(c,x+10,h-118,3.2); c.fill();
+      c.fillStyle = '#f08a24'; c.beginPath(); c.moveTo(x,h-112); c.lineTo(x+18,h-108); c.lineTo(x,h-105); c.fill();
+    }
+  },
+  sakura:{ name:'桜', bar:'#c94f7c', ink:'#8f2c58', plate:'#ffffff', month:'#c23b6e', year:'#7b4a9e', note:'#fff4f8', shadow:'rgba(255,255,255,.9)',
+    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#ffd3e2','#ffeef4'); c.fillRect(0,0,w,h); },
+    back(c,w,h,mini){
+      const r = rng(9), ox = mini ? (w-260)/2 : 0;
+      c.fillStyle = 'rgba(238,128,168,.5)'; for(let i=0;i<(mini?14:42);i++){ c.beginPath(); c.ellipse(r()*w,r()*h,4+r()*4,7+r()*4,r()*6,0,Math.PI*2); c.fill(); }
+      c.strokeStyle = '#7a4b3a'; c.lineCap = 'round';
+      c.lineWidth = 8; c.beginPath(); c.moveTo(ox-20,34); c.quadraticCurveTo(ox+100,8,ox+262,74); c.stroke();
+      c.lineWidth = 4; c.beginPath(); c.moveTo(ox+110,30); c.quadraticCurveTo(ox+150,70,ox+168,130); c.moveTo(ox+56,28); c.quadraticCurveTo(ox+40,80,ox+44,122); c.stroke();
+      [[60,48,26,0],[150,38,22,1],[236,74,22,2],[168,128,25,0],[44,120,23,1],[104,94,19,2],[210,170,17,1]].forEach(([x,y,s,k]) => flower(c,ox+x,y,s,['#ffb3c8','#ff9ebb','#ffc8d7'][k]));
+    },
+    front(c,w,h){ flower(c,w-52,52,24,'#ff9ebb'); flower(c,w-18,96,18,'#ffc8d7'); }
+  },
+  summer:{ name:'夏', bar:'#0d74b5', ink:'#0b5f94', plate:'#ffffff', month:'#ffffff', year:'#fff27a', note:'#effaff', shadow:'rgba(0,60,110,.45)',
+    bg:(c,w,h) => { c.fillStyle = lin(c,h,'#2fb0ec','#aee8ff'); c.fillRect(0,0,w,h); },
+    back(c,w,h,mini){
+      const ox = mini ? (w-260)/2 : 0, x = ox+112, y = 86;
+      c.save(); c.translate(x,y); c.fillStyle = '#ffd23f';
+      for(let k=0;k<12;k++){ c.rotate(Math.PI/6); c.beginPath(); c.moveTo(-9,-60); c.lineTo(0,-82); c.lineTo(9,-60); c.fill(); }
+      c.restore(); c.fillStyle = '#ffc928'; circle(c,x,y,54); c.fill(); c.fillStyle = '#ffe271'; circle(c,x-8,y-8,40); c.fill();
+      cloud(c,ox+180,170,1.1); if(!mini){ cloud(c,560,44,.8); cloud(c,960,34,.7); }
+      [['#1e88c9',h-40,12,0],['rgba(255,255,255,.75)',h-26,8,40],['#0f6fae',h-16,7,80]].forEach(([col,base,amp,ph]) => {
+        c.fillStyle = col; c.beginPath(); c.moveTo(0,h);
+        for(let px=0; px<=w; px+=6) c.lineTo(px, base + Math.sin((px+ph)/38)*amp);
+        c.lineTo(w,h); c.closePath(); c.fill();
+      });
+    }
+  },
+  simple:{ name:'シンプル', bar:'#22385e', ink:'#22385e', plate:'#f3f5f9', month:'#ffffff', year:'#f2c14e', note:'#f5f7fa', shadow:'rgba(0,0,0,.2)',
+    bg:(c,w,h) => { c.fillStyle = '#22385e'; c.fillRect(0,0,w,h); },
+    back(c,w,h,mini){
+      const ox = mini ? (w-260)/2 : 0; c.strokeStyle = 'rgba(255,255,255,.1)'; c.lineWidth = 2;
+      [[120,110,90],[120,110,130],[120,110,170]].forEach(([x,y,r]) => { circle(c,ox+x,y,r); c.stroke(); });
+      c.fillStyle = '#f2c14e'; circle(c,ox+120,110,20); c.fill();
+    }
+  }
+};
+const THEME_ORDER = ['moon','momiji','snow','sakura','summer','simple'];
+
+function drawIcon(ctx,t,ix,iy,iw,ih,r){
+  ctx.save(); rr(ctx,ix,iy,iw,ih,r); ctx.clip(); ctx.translate(ix,iy);
+  const sc = ih/250; ctx.scale(sc,sc); const vw = iw/sc;
+  t.bg(ctx,vw,250); t.back(ctx,vw,250,true); ctx.restore();
+}
+
+/* ---------- fonts ---------- */
+const askedChars = new Set();
+function ensureFonts(text){
+  if(!document.fonts || !document.fonts.load) return;
+  let fresh = ''; for(const ch of text) if(!askedChars.has(ch)){ askedChars.add(ch); fresh += ch; }
+  if(!fresh) return;
+  Promise.all(['500','700','900'].map(w => document.fonts.load(`${w} 24px "Zen Maru Gothic"`, fresh))).then(() => scheduleDraw()).catch(() => {});
+}
+
+/* ---------- poster ---------- */
+const canvas = $('#poster'), ctx = canvas.getContext('2d');
+const measurer = document.createElement('canvas').getContext('2d');
+const W = 1080, M = 14, S = 2;
+function wrap(c,text,maxW){
+  const out = [];
+  String(text).split('\n').forEach(par => {
+    let line = '';
+    for(const ch of par){ if(line && c.measureText(line+ch).width > maxW){ out.push(line); line = ch; } else line += ch; }
+    out.push(line);
+  });
+  return out;
+}
+// 場所名: まず縮めて1行に収め、無理なら行ごとの文字数をそろえて折り返す
+function placeLines(c,text,maxW){
+  const one = String(text).indexOf('\n') < 0;
+  if(one){ const sz = fitSize(c,text,'700',23,19,maxW); if(c.measureText(text).width <= maxW) return [{s:text, f:`700 ${sz}px ${FONT}`}]; }
+  c.font = `700 23px ${FONT}`;
+  const out = [];
+  String(text).split('\n').forEach(par => {
+    const n = wrap(c, par, maxW).length, chars = [...par], per = Math.ceil(chars.length / n);
+    for(let i=0; i<chars.length; i+=per) out.push({s:chars.slice(i,i+per).join(''), f:`700 23px ${FONT}`});
+    if(!chars.length) out.push({s:'', f:`700 23px ${FONT}`});
+  });
+  return out;
+}
+function fitSize(c,text,weight,size,min,maxW){ while(size > min){ c.font = `${weight} ${size}px ${FONT}`; if(c.measureText(text).width <= maxW) break; size -= 1; } c.font = `${weight} ${size}px ${FONT}`; return size; }
+function setSpacing(c,v){ if('letterSpacing' in c) c.letterSpacing = v; }
+
+let layout = null;
+function draw(){
+  const {y,m} = state.cur, md = monthData(), t = THEMES[md.theme] || THEMES.moon;
+  const dow0 = new Date(y,m-1,1).getDay(), nd = new Date(y,m,0).getDate();
+  const rows = Math.ceil((dow0+nd)/7);
+  const headerH = 250, barY = 262, barH = 48, gridY = barY+barH, rowH = rows === 6 ? 158 : 184, gridH = rows*rowH;
+  const cellW = (W-2*M)/7;
+  const iconW = 240;
+  measurer.font = `500 25px ${FONT}`; setSpacing(measurer,'1px');
+  const noteLines = state.notes.trim() ? wrap(measurer, state.notes.trim(), W-2*M-60-iconW) : [];
+  const notesY = gridY+gridH+20, notesH = Math.max(140, 48+noteLines.length*42);
+  const H = notesY+notesH+16;
+
+  let txt = state.title + `${m}月${y}年日曜月火水木金土お休み0123456789〜時半分` + state.notes;
+  Object.values(md.days).forEach(e => txt += timeStr(e) + (e.place||''));
+  ensureFonts(txt);
+
+  canvas.width = W*S; canvas.height = H*S;
+  const c = ctx; c.setTransform(S,0,0,S,0,0); c.textAlign = 'center'; c.textBaseline = 'middle'; setSpacing(c,'0px');
+  c.fillStyle = '#ffffff'; c.fillRect(0,0,W,H);
+
+  // header
+  c.save(); rr(c,0,0,W,headerH,[28,28,0,0]); c.clip();
+  t.bg(c,W,headerH); t.back(c,W,headerH,false);
+  c.fillStyle = t.plate; rr(c,486,96,W-486-24,124,32); c.fill();
+  if(t.front) t.front(c,W,headerH);
+  c.restore();
+  c.save(); c.shadowColor = t.shadow; c.shadowBlur = 10; c.shadowOffsetY = 3;
+  c.fillStyle = t.month; fitSize(c,`${m}月`,'900',134,70,236); c.textBaseline = 'alphabetic'; c.fillText(`${m}月`,358,168);
+  c.font = `700 34px ${FONT}`; c.fillStyle = t.year; c.fillText(`${y}年`,358,214); c.restore();
+  c.fillStyle = t.ink; c.textBaseline = 'middle'; setSpacing(c,'2px');
+  fitSize(c,state.title || '練習日程表','900',72,30,W-486-24-64); c.fillText(state.title || '練習日程表', 486+(W-486-24)/2, 160);
+  setSpacing(c,'0px');
+
+  // weekday bar
+  c.fillStyle = t.bar; rr(c,M,barY,W-2*M,barH,[12,12,0,0]); c.fill();
+  c.fillStyle = '#ffffff'; c.font = `700 24px ${FONT}`; setSpacing(c,'1px');
+  WD.forEach((d,i) => c.fillText(d+'曜日', M+cellW*i+cellW/2, barY+barH/2+1));
+
+  // grid
+  c.fillStyle = '#ffffff'; c.fillRect(M,gridY,W-2*M,gridH);
+  const cells = [];
+  for(let i=0;i<rows*7;i++){
+    const col = i%7, row = Math.floor(i/7), x = M+col*cellW, yy = gridY+row*rowH;
+    const dt = new Date(y,m-1,1-dow0+i), inMonth = dt.getMonth() === m-1, d = dt.getDate();
+    c.fillStyle = inMonth ? '#1a1f36' : '#b7bccb'; c.font = `700 32px ${FONT}`; setSpacing(c,'0px');
+    c.fillText(String(d), x+cellW/2, yy+38);
+    if(inMonth){
+      cells.push({d, x, y:yy, w:cellW, h:rowH, dow:col});
+      const e = md.days[d];
+      if(e){
+        setSpacing(c,'1.5px');
+        const maxW = cellW-16, top = yy+66, areaH = rowH-66-10;
+        if(e.off){
+          c.fillStyle = '#e0322e'; c.font = `700 27px ${FONT}`;
+          const ls = wrap(c, e.place || 'お休み', maxW), lh = 34;
+          ls.forEach((l,k) => c.fillText(l, x+cellW/2, top + (areaH-ls.length*lh)/2 + lh/2 + k*lh));
+        } else {
+          const lines = [], ts = timeStr(e);
+          if(ts){ const sz = fitSize(c,ts,'700',23,15,maxW); lines.push({s:ts, f:`700 ${sz}px ${FONT}`}); }
+          c.font = `700 23px ${FONT}`;
+          if(e.place) placeLines(c, e.place, maxW).forEach(l => lines.push(l));
+          const lh = 34; c.fillStyle = '#1a1f36';
+          lines.forEach((l,k) => { c.font = l.f; c.fillText(l.s, x+cellW/2, top + (areaH-lines.length*lh)/2 + lh/2 + k*lh); });
+        }
+      }
+    }
+  }
+  c.strokeStyle = '#dcdfea'; c.lineWidth = 1.5; c.beginPath();
+  for(let i=1;i<7;i++){ c.moveTo(M+cellW*i,gridY); c.lineTo(M+cellW*i,gridY+gridH); }
+  for(let r=1;r<rows;r++){ c.moveTo(M,gridY+rowH*r); c.lineTo(W-M,gridY+rowH*r); }
+  c.stroke();
+  c.strokeStyle = '#cfd4e3'; rr(c,M,barY,W-2*M,barH+gridH,[12,12,12,12]); c.stroke();
+
+  // notes
+  c.fillStyle = t.note; c.strokeStyle = t.bar+'66'; c.lineWidth = 1.5; c.setLineDash([4,4]);
+  rr(c,M,notesY,W-2*M,notesH,16); c.fill(); c.stroke(); c.setLineDash([]);
+  c.fillStyle = '#26304f'; c.font = `500 25px ${FONT}`; c.textAlign = 'left'; setSpacing(c,'1px');
+  const nTop = notesY + (notesH - noteLines.length*42)/2 + 21;
+  noteLines.forEach((l,k) => c.fillText(l, M+30, nTop + k*42));
+  c.textAlign = 'center'; setSpacing(c,'0px');
+  drawIcon(c,t,W-M-iconW-12,notesY+12,iconW,notesH-24,18);
+
+  layout = {H, cells};
+  syncOverlay();
+}
+let drawQueued = false;
+function scheduleDraw(){ if(drawQueued) return; drawQueued = true; requestAnimationFrame(() => { drawQueued = false; draw(); }); }
+
+/* ---------- overlay (click targets) ---------- */
+const overlay = $('#overlay');
+let overlayKey = '';
+function syncOverlay(){
+  const {y,m} = state.cur, k = keyOf(y,m) + layout.cells.length;
+  if(k !== overlayKey){
+    overlayKey = k; overlay.innerHTML = '';
+    layout.cells.forEach(cell => { const b = document.createElement('button'); b.type = 'button'; b.className = 'cellbtn'; b.dataset.d = cell.d; b.addEventListener('click', () => onCell(cell.d)); overlay.appendChild(b); });
+  }
+  const md = monthData();
+  [...overlay.children].forEach((b,i) => {
+    const cell = layout.cells[i], e = md.days[cell.d];
+    Object.assign(b.style, {left:cell.x/W*100+'%', top:cell.y/layout.H*100+'%', width:cell.w/W*100+'%', height:cell.h/layout.H*100+'%'});
+    b.classList.toggle('sel', tool === 'edit' && selDay === cell.d);
+    b.setAttribute('aria-label', `${m}月${cell.d}日（${WD[cell.dow]}）` + (e ? (e.off ? ' ' + (e.place||'お休み') : ` ${timeStr(e)} ${e.place||''}`) : ' 予定なし'));
+  });
+}
+
+/* ---------- tools ---------- */
+let tool = 'edit', selDay = null;
+const undoStack = [];
+function pushUndo(){ undoStack.push({k:keyOf(state.cur.y,state.cur.m), days:JSON.stringify(monthData().days)}); if(undoStack.length > 60) undoStack.shift(); $('#undo').disabled = false; }
+function commit(){ save(); scheduleDraw(); renderPlaces(); }
+
+function onCell(d){
+  const days = monthData().days;
+  if(tool === 'edit'){
+    selDay = d; renderEditor(); scheduleDraw();
+    if(window.innerWidth < 880) $('#editor').scrollIntoView({behavior:'smooth', block:'nearest'});
+    return;
+  }
+  pushUndo();
+  if(tool === 'off'){ if(days[d] && days[d].off) delete days[d]; else days[d] = {off:true, place:''}; }
+  else {
+    const p = state.presets.find(p => p.id === tool); if(!p) return;
+    const e = {s:p.s, e:p.e, place:p.place};
+    if(days[d] && sig(days[d]) === sig(e)) delete days[d]; else days[d] = e;
+  }
+  commit();
+}
+
+function renderTools(){
+  const chips = [`<button type="button" class="chip edit" data-tool="edit" aria-pressed="${tool==='edit'}"><span class="t">選んで編集</span>1日ずつ細かく</button>`]
+    .concat(state.presets.map(p => `<button type="button" class="chip" data-tool="${p.id}" aria-pressed="${tool===p.id}"><span class="t">${esc(timeStr(p) || '時間なし')}</span>${esc(p.place || '（場所未入力）')}</button>`))
+    .concat([`<button type="button" class="chip off" data-tool="off" aria-pressed="${tool==='off'}"><span class="t">お休み</span>赤字で表示</button>`]);
+  $('#tools').innerHTML = chips.join('');
+  $('#hint').textContent = tool === 'edit'
+    ? 'カレンダーの日付をタップすると、その日の内容を編集できます。'
+    : '日付をタップすると入ります。同じ日をもう一度タップすると消えます。';
+  $('#bulk').innerHTML = tool === 'edit' ? '' : '毎週' + WD.map((w,i) => `<button type="button" data-wd="${i}" aria-label="毎週${w}曜日に入れる">${w}</button>`).join('') + 'にまとめて入れる';
+  $('#editor').hidden = !(tool === 'edit' && selDay);
+}
+$('#tools').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-tool]'); if(!b) return;
+  tool = b.dataset.tool; renderTools(); scheduleDraw();
+});
+$('#bulk').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-wd]'); if(!b) return;
+  const wd = +b.dataset.wd, {y,m} = state.cur, nd = new Date(y,m,0).getDate(), days = monthData().days;
+  let e;
+  if(tool === 'off') e = {off:true, place:''};
+  else { const p = state.presets.find(p => p.id === tool); if(!p) return; e = {s:p.s, e:p.e, place:p.place}; }
+  pushUndo(); let n = 0;
+  for(let d=1; d<=nd; d++) if(new Date(y,m-1,d).getDay() === wd){ days[d] = {...e}; n++; }
+  commit(); toast(`毎週${WD[wd]}曜日（${n}日分）に入れました`);
+});
+
+/* ---------- day editor ---------- */
+function renderEditor(){
+  const ed = $('#editor');
+  if(!(tool === 'edit' && selDay)){ ed.hidden = true; return; }
+  const {y,m} = state.cur, d = selDay, e = monthData().days[d];
+  const kind = !e ? 'none' : e.off ? 'off' : 'practice';
+  const dow = new Date(y,m-1,d).getDay();
+  let body = '';
+  if(kind === 'practice') body = `
+    <div class="grid3">
+      <label class="f" for="edS">開始<select id="edS">${timeOpts(e.s)}</select></label>
+      <label class="f" for="edE">終了<select id="edE">${timeOpts(e.e)}</select></label>
+      <label class="f wide" for="edPlace">場所・内容<input type="text" id="edPlace" list="places" value="${esc(e.place||'')}" placeholder="例：安岐体育館"></label>
+    </div>
+    <div class="row"><button type="button" class="btn" id="edToPreset">この内容をパターンに登録</button></div>`;
+  else if(kind === 'off') body = `
+    <label class="f" for="edOff">表示する文字（空欄なら「お休み」）<input type="text" id="edOff" value="${esc(e.place||'')}" placeholder="お休み"></label>`;
+  ed.innerHTML = `
+    <div class="row spread"><strong>${m}月${d}日（${WD[dow]}）</strong><button type="button" class="btn" id="edClose">閉じる</button></div>
+    <div class="seg" role="group" aria-label="この日の種類">
+      <button type="button" data-kind="practice" aria-pressed="${kind==='practice'}">練習</button>
+      <button type="button" data-kind="off" aria-pressed="${kind==='off'}">お休み・赤字</button>
+      <button type="button" data-kind="none" aria-pressed="${kind==='none'}">なし</button>
+    </div>${body}`;
+  ed.hidden = false;
+}
+$('#editor').addEventListener('click', ev => {
+  const days = monthData().days, d = selDay;
+  const k = ev.target.closest('[data-kind]');
+  if(k){
+    const kind = k.dataset.kind, cur = days[d];
+    pushUndo();
+    if(kind === 'none') delete days[d];
+    else if(kind === 'off') days[d] = {off:true, place: cur && cur.off ? cur.place : ''};
+    else if(!cur || cur.off){ const p = state.presets[0]; days[d] = p ? {s:p.s, e:p.e, place:p.place} : {s:'', e:'', place:''}; }
+    commit(); renderEditor(); return;
+  }
+  if(ev.target.id === 'edClose'){ selDay = null; renderTools(); scheduleDraw(); return; }
+  if(ev.target.id === 'edToPreset'){
+    const e = days[d]; if(!e) return;
+    if(state.presets.some(p => sig(p) === sig(e))){ toast('同じパターンがすでにあります'); return; }
+    state.presets.push({id:uid(), s:e.s, e:e.e, place:e.place}); save(); renderPresets(); renderTools(); toast('パターンに登録しました');
+  }
+});
+let editUndoArmed = true;
+$('#editor').addEventListener('focusin', () => { editUndoArmed = true; });
+$('#editor').addEventListener('input', ev => {
+  const e = monthData().days[selDay]; if(!e) return;
+  if(editUndoArmed){ pushUndo(); editUndoArmed = false; }
+  const id = ev.target.id, v = ev.target.value;
+  if(id === 'edS') e.s = v; else if(id === 'edE') e.e = v; else if(id === 'edPlace' || id === 'edOff') e.place = v;
+  commit();
+});
+
+/* ---------- presets panel ---------- */
+function renderPresets(){
+  $('#presetList').innerHTML = state.presets.length ? state.presets.map(p => `
+    <div class="prow" data-id="${p.id}">
+      <select data-k="s" aria-label="開始時刻">${timeOpts(p.s)}</select><span>〜</span>
+      <select data-k="e" aria-label="終了時刻">${timeOpts(p.e)}</select>
+      <button type="button" class="btn warn del" aria-label="このパターンを削除">削除</button>
+      <input type="text" data-k="place" list="places" value="${esc(p.place)}" placeholder="場所（例：勤労者体育館）" aria-label="場所">
+    </div>`).join('') : '<p class="hint">まだパターンがありません。</p>';
+}
+$('#presetList').addEventListener('input', ev => {
+  const row = ev.target.closest('.prow'), k = ev.target.dataset.k; if(!row || !k) return;
+  const p = state.presets.find(p => p.id === row.dataset.id); if(!p) return;
+  p[k] = ev.target.value; save(); renderTools();
+});
+$('#presetList').addEventListener('click', ev => {
+  if(!ev.target.classList.contains('del')) return;
+  const id = ev.target.closest('.prow').dataset.id;
+  state.presets = state.presets.filter(p => p.id !== id);
+  if(tool === id) tool = 'edit';
+  save(); renderPresets(); renderTools();
+});
+$('#addPreset').addEventListener('click', () => {
+  state.presets.push({id:uid(), s:'9:00', e:'12:00', place:''}); save(); renderPresets(); renderTools();
+  const inputs = $('#presetList').querySelectorAll('input'); inputs[inputs.length-1].focus();
+});
+function renderPlaces(){
+  const set = new Set(state.presets.map(p => p.place).filter(Boolean));
+  Object.values(state.months).forEach(md => Object.values(md.days).forEach(e => { if(!e.off && e.place) set.add(e.place); }));
+  $('#places').innerHTML = [...set].map(p => `<option value="${esc(p)}"></option>`).join('');
+}
+
+/* ---------- basics ---------- */
+function renderBasics(){
+  $('#title').value = state.title;
+  $('#notes').value = state.notes;
+  renderMonth();
+}
+function renderMonth(){
+  const {y,m} = state.cur;
+  $('#monthLabel').textContent = `${y}年${m}月`;
+  const cur = monthData().theme;
+  $('#themes').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.theme === cur));
+}
+function buildThemes(){
+  $('#themes').innerHTML = THEME_ORDER.map(id => `<button type="button" data-theme="${id}"><canvas width="240" height="120"></canvas>${THEMES[id].name}</button>`).join('');
+  $('#themes').querySelectorAll('button').forEach(b => { const c = b.querySelector('canvas').getContext('2d'); drawIcon(c,THEMES[b.dataset.theme],0,0,240,120,0); });
+}
+$('#themes').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-theme]'); if(!b) return;
+  monthData().theme = b.dataset.theme; save(); renderMonth(); scheduleDraw();
+});
+$('#title').addEventListener('input', ev => { state.title = ev.target.value; save(); scheduleDraw(); });
+$('#notes').addEventListener('input', ev => { state.notes = ev.target.value; save(); scheduleDraw(); });
+function shiftMonth(n){
+  let {y,m} = state.cur; m += n; if(m < 1){ m = 12; y--; } if(m > 12){ m = 1; y++; }
+  state.cur = {y,m}; selDay = null; save(); renderMonth(); renderTools(); renderEditor(); scheduleDraw();
+}
+$('#prevM').addEventListener('click', () => shiftMonth(-1));
+$('#nextM').addEventListener('click', () => shiftMonth(1));
+
+$('#undo').addEventListener('click', () => {
+  const u = undoStack.pop(); if(!u) return;
+  state.months[u.k].days = JSON.parse(u.days);
+  const [y,m] = u.k.split('-').map(Number); state.cur = {y,m};
+  $('#undo').disabled = !undoStack.length;
+  commit(); renderMonth(); renderEditor(); toast('元に戻しました');
+});
+$('#undo').disabled = true;
+
+$('#fillPrev').addEventListener('click', () => {
+  const {y,m} = state.cur, py = m === 1 ? y-1 : y, pm = m === 1 ? 12 : m-1;
+  const prev = state.months[keyOf(py,pm)];
+  if(!prev || !Object.keys(prev.days).length){ toast(`${pm}月の予定がありません`); return; }
+  const best = WD.map((_,wd) => {
+    const count = {};
+    Object.entries(prev.days).forEach(([d,e]) => { if(!e.off && new Date(py,pm-1,+d).getDay() === wd){ const k = sig(e); count[k] = count[k] || {e, n:0}; count[k].n++; } });
+    const top = Object.values(count).sort((a,b) => b.n-a.n)[0];
+    return top && top.n >= 2 ? top.e : null;
+  });
+  const days = monthData().days, nd = new Date(y,m,0).getDate();
+  pushUndo(); let n = 0;
+  for(let d=1; d<=nd; d++){ const e = best[new Date(y,m-1,d).getDay()]; if(e && !days[d]){ days[d] = {s:e.s, e:e.e, place:e.place}; n++; } }
+  commit(); toast(n ? `${pm}月と同じ曜日で${n}日分を入れました` : '入れられる日がありませんでした');
+});
+
+let clearArmed = null;
+$('#clearMonth').addEventListener('click', ev => {
+  const b = ev.currentTarget;
+  if(!clearArmed){ b.textContent = 'もう一度押すと消去'; clearArmed = setTimeout(() => { clearArmed = null; b.textContent = 'この月を空にする'; }, 3000); return; }
+  clearTimeout(clearArmed); clearArmed = null; b.textContent = 'この月を空にする';
+  pushUndo(); monthData().days = {}; selDay = null; commit(); renderEditor(); toast('この月の予定を消しました（元に戻せます）');
+});
+
+/* ---------- export ---------- */
+let outBlob = null, outUrl = null;
+$('#exportBtn').addEventListener('click', () => {
+  const prevSel = selDay; draw();
+  canvas.toBlob(blob => {
+    if(!blob){ toast('画像を作れませんでした'); return; }
+    outBlob = blob; if(outUrl) URL.revokeObjectURL(outUrl); outUrl = URL.createObjectURL(blob);
+    $('#outImg').src = outUrl;
+    $('#modal').hidden = false;
+  }, 'image/png');
+  selDay = prevSel;
+});
+const imgName = () => `練習日程表_${state.cur.y}年${state.cur.m}月.png`;
+function saveFile(blob, filename){
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+$('#saveImg').addEventListener('click', () => { if(outBlob) saveFile(outBlob, imgName()); });
+const canShareFiles = (() => { try{ return !!(navigator.canShare && navigator.canShare({files:[new File([''], 'a.png', {type:'image/png'})]})); }catch(e){ return false; } })();
+$('#shareImg').hidden = !canShareFiles;
+$('#shareImg').addEventListener('click', async () => {
+  if(!outBlob) return;
+  try{ await navigator.share({files:[new File([outBlob], imgName(), {type:'image/png'})], title:`${state.cur.m}月の練習日程`}); }
+  catch(e){ if(e && e.name !== 'AbortError') toast('共有できませんでした。「画像を保存」を使ってください'); }
+});
+
+/* ---------- backup ---------- */
+$('#backupOut').addEventListener('click', () => {
+  const d = new Date(), stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  saveFile(new Blob([JSON.stringify(state, null, 1)], {type:'application/json'}), `練習日程表_バックアップ_${stamp}.json`);
+});
+$('#backupIn').addEventListener('change', async ev => {
+  const f = ev.target.files[0]; ev.target.value = ''; if(!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    if(!data || !Array.isArray(data.presets) || typeof data.months !== 'object' || !data.cur) throw new Error('bad');
+    state = data; undoStack.length = 0; $('#undo').disabled = true; selDay = null; tool = 'edit';
+    save(); renderBasics(); renderPresets(); renderTools(); renderEditor(); renderPlaces(); scheduleDraw();
+    toast('バックアップを読み込みました');
+  }catch(e){ toast('読み込めませんでした。このアプリで書き出したファイルを選んでください'); }
+});
+$('#closeModal').addEventListener('click', () => { $('#modal').hidden = true; });
+$('#modal').addEventListener('click', ev => { if(ev.target.id === 'modal') $('#modal').hidden = true; });
+$('#copyImg').addEventListener('click', async () => {
+  try{ await navigator.clipboard.write([new ClipboardItem({'image/png': outBlob})]); toast('画像をコピーしました'); }
+  catch(e){ toast('コピーできませんでした。画像を長押し・右クリックしてください'); }
+});
+
+let toastTimer;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600); }
+
+/* ---------- boot ---------- */
+buildThemes(); renderBasics(); renderPresets(); renderTools(); renderPlaces(); draw();
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(() => { scheduleDraw(); buildThemes(); renderMonth(); });
+if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+if('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
