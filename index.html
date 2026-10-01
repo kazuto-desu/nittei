@@ -98,6 +98,7 @@ button{font:inherit;color:var(--ink);cursor:pointer}
 .msgopts label{display:flex;gap:6px;align-items:center;cursor:pointer}
 .msgopts input{width:18px;height:18px;accent-color:var(--accent)}
 #msgText{font-size:14px;line-height:1.7}
+.msgopts label.sub:has(input:disabled){opacity:.45;cursor:default}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;z-index:20;transition:opacity .2s}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 </style>
@@ -195,17 +196,18 @@ button{font:inherit;color:var(--ink);cursor:pointer}
 <div class="modal" id="msgModal" hidden>
   <div class="box">
     <div class="row spread"><h2 style="margin:0;font-family:var(--display)">配信文</h2><button class="btn" id="closeMsg" type="button">閉じる</button></div>
-    <label class="f" for="msgIntro">はじめのあいさつ（「{月}」は月の数字になります）
-      <input type="text" id="msgIntro">
+    <label class="f" for="msgIntro">いつもの文章（「{月}」と書いたところは月の数字になります）
+      <textarea id="msgIntro" rows="5"></textarea>
     </label>
     <div class="msgopts">
-      <label><input type="checkbox" id="msgEmoji"> 絵文字を入れる</label>
-      <label><input type="checkbox" id="msgOff"> お休みの日も書く</label>
-      <label><input type="checkbox" id="msgNotes"> 注意書きを入れる</label>
-      <label><input type="checkbox" id="msgFromToday"> 今日以降の予定だけ</label>
+      <label><input type="checkbox" id="msgList"> 日程の一覧も入れる</label>
+      <label><input type="checkbox" id="msgNotes"> 注意書きも入れる</label>
+      <label class="sub"><input type="checkbox" id="msgEmoji"> 一覧に絵文字</label>
+      <label class="sub"><input type="checkbox" id="msgOff"> お休みの日も書く</label>
+      <label class="sub"><input type="checkbox" id="msgFromToday"> 今日以降の予定だけ</label>
     </div>
     <label class="f" for="msgText">できあがった文章（ここで直接書き直せます）
-      <textarea id="msgText" rows="12"></textarea>
+      <textarea id="msgText" rows="7"></textarea>
     </label>
     <div class="row">
       <button class="btn primary" id="copyMsg" type="button">コピー</button>
@@ -810,16 +812,20 @@ $('#shareImg').addEventListener('click', async () => {
 });
 
 /* ---------- announcement text ---------- */
-const MSG_DEFAULT = {intro:'お疲れさまです！{月}月の練習日程をお知らせします。', emoji:true, off:true, notes:true, fromToday:false};
-const msgOpts = () => (state.msg = Object.assign({}, MSG_DEFAULT, state.msg || {}));
+const MSG_DEFAULT = {intro:'こんばんは🌃\nニポポバドミントンクラブです🧸\n\n{月}月の練習日程表です🌱\n来月もよろしくお願いします(⋆ᴗ͈ˬᴗ͈⋆)', list:false, emoji:true, off:true, notes:false, fromToday:false};
+const OLD_INTRO = 'お疲れさまです！{月}月の練習日程をお知らせします。';
+const msgOpts = () => {
+  if(state.msg && state.msg.intro === OLD_INTRO) state.msg = null;   // 前の版の初期設定は新しい文章に置き換える
+  return (state.msg = Object.assign({}, MSG_DEFAULT, state.msg || {}));
+};
 function buildMessage(){
   const o = msgOpts(), {y,m} = state.cur, days = monthData().days, nd = new Date(y,m,0).getDate();
   const now = new Date(), fromDay = o.fromToday && now.getFullYear() === y && now.getMonth()+1 === m ? now.getDate() : 1;
-  const name = state.title || '練習日程表';
   const out = [];
-  out.push(o.emoji ? `📅【${name}】${y}年${m}月` : `【${name}】${y}年${m}月`);
   if(o.intro.trim()) out.push(o.intro.trim().replace(/\{月\}/g, m));
-  out.push('');
+  const tail = () => { if(o.notes && state.notes.trim()){ out.push(''); out.push(state.notes.trim()); } return out.join('\n'); };
+  if(!o.list) return tail();
+  if(out.length) out.push('');
   let n = 0;
   for(let d = fromDay; d <= nd; d++){
     const e = days[d]; if(!e) continue;
@@ -830,13 +836,14 @@ function buildMessage(){
     n++;
   }
   if(!n) out.push('（予定はまだ入っていません）');
-  if(o.notes && state.notes.trim()){ out.push(''); out.push(state.notes.trim()); }
-  return out.join('\n');
+  return tail();
 }
+function syncSubOpts(){ ['#msgEmoji','#msgOff','#msgFromToday'].forEach(s => { $(s).disabled = !msgOpts().list; }); }
 function syncMsgForm(){
   const o = msgOpts();
   $('#msgIntro').value = o.intro;
-  $('#msgEmoji').checked = o.emoji; $('#msgOff').checked = o.off; $('#msgNotes').checked = o.notes; $('#msgFromToday').checked = o.fromToday;
+  $('#msgList').checked = o.list; $('#msgEmoji').checked = o.emoji; $('#msgOff').checked = o.off; $('#msgNotes').checked = o.notes; $('#msgFromToday').checked = o.fromToday;
+  syncSubOpts();
   $('#msgText').value = buildMessage();
 }
 function openMsg(){ $('#modal').hidden = true; syncMsgForm(); $('#msgModal').hidden = false; }
@@ -848,6 +855,7 @@ $('#msgModal').addEventListener('input', ev => {
   const o = msgOpts(), id = ev.target.id;
   if(id === 'msgText') return;
   if(id === 'msgIntro') o.intro = ev.target.value;
+  else if(id === 'msgList'){ o.list = ev.target.checked; syncSubOpts(); }
   else if(id === 'msgEmoji') o.emoji = ev.target.checked;
   else if(id === 'msgOff') o.off = ev.target.checked;
   else if(id === 'msgNotes') o.notes = ev.target.checked;
