@@ -73,6 +73,7 @@ button{font:inherit;color:var(--ink);cursor:pointer}
 .bulk button{width:34px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);font-weight:700}
 .bulk button:hover{border-color:var(--accent)}
 .editor{background:var(--accent-soft);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.editor textarea{min-height:5.5em}
 .editor strong{font-family:var(--display);font-size:17px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface)}
 .seg button{border:0;background:transparent;padding:6px 14px;font-size:13px}
@@ -226,7 +227,9 @@ function monthData(y = state.cur.y, m = state.cur.m){
 }
 const fmt = t => { if(!t) return ''; const [h,mm] = t.split(':').map(Number); return h + '時' + (mm===0 ? '' : mm===30 ? '半' : mm + '分'); };
 const timeStr = e => e.s && e.e ? `${fmt(e.s)}〜${fmt(e.e)}` : e.s ? `${fmt(e.s)}〜` : '';
-const sig = e => JSON.stringify([!!e.off, e.s||'', e.e||'', e.place||'']);
+const sig = e => JSON.stringify([!!e.off, e.s||'', e.e||'', e.place||'', e.text === undefined ? null : e.text]);
+const isFree = e => !!e && e.text !== undefined;
+const editing = () => tool === 'edit' || tool === 'free';
 const TIMES = []; for(let h=5; h<=23; h++){ TIMES.push(h+':00'); if(h<23) TIMES.push(h+':30'); }
 const timeOpts = v => `<option value=""${!v?' selected':''}>なし</option>` + TIMES.map(t => `<option value="${t}"${t===v?' selected':''}>${fmt(t)}</option>`).join('');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -438,7 +441,7 @@ function draw(){
   const H = notesY+notesH+16;
 
   let txt = state.title + `${m}月${y}年日曜月火水木金土お休み0123456789〜時半分` + state.notes;
-  Object.values(md.days).forEach(e => txt += timeStr(e) + (e.place||''));
+  Object.values(md.days).forEach(e => txt += timeStr(e) + (e.place||'') + (e.text||''));
   ensureFonts(txt);
 
   canvas.width = W*S; canvas.height = H*S;
@@ -477,7 +480,12 @@ function draw(){
       if(e){
         setSpacing(c,'1.5px');
         const maxW = cellW-16, top = yy+66, areaH = rowH-66-10;
-        if(e.off){
+        if(isFree(e)){
+          let fs = 23, lh = 32, ls;
+          for(;;){ c.font = `700 ${fs}px ${FONT}`; ls = wrap(c, e.text, maxW); if(ls.length*lh <= areaH || fs <= 15) break; fs -= 2; lh = Math.round(fs*1.38); }
+          c.fillStyle = '#1a1f36';
+          ls.forEach((l,k) => c.fillText(l, x+cellW/2, top + (areaH-ls.length*lh)/2 + lh/2 + k*lh));
+        } else if(e.off){
           c.fillStyle = '#e0322e'; c.font = `700 27px ${FONT}`;
           const ls = wrap(c, e.place || 'お休み', maxW), lh = 34;
           ls.forEach((l,k) => c.fillText(l, x+cellW/2, top + (areaH-ls.length*lh)/2 + lh/2 + k*lh));
@@ -526,8 +534,8 @@ function syncOverlay(){
   [...overlay.children].forEach((b,i) => {
     const cell = layout.cells[i], e = md.days[cell.d];
     Object.assign(b.style, {left:cell.x/W*100+'%', top:cell.y/layout.H*100+'%', width:cell.w/W*100+'%', height:cell.h/layout.H*100+'%'});
-    b.classList.toggle('sel', tool === 'edit' && selDay === cell.d);
-    b.setAttribute('aria-label', `${m}月${cell.d}日（${WD[cell.dow]}）` + (e ? (e.off ? ' ' + (e.place||'お休み') : ` ${timeStr(e)} ${e.place||''}`) : ' 予定なし'));
+    b.classList.toggle('sel', editing() && selDay === cell.d);
+    b.setAttribute('aria-label', `${m}月${cell.d}日（${WD[cell.dow]}）` + (e ? isFree(e) ? ' ' + e.text.replace(/\n/g,' ') : (e.off ? ' ' + (e.place||'お休み') : ` ${timeStr(e)} ${e.place||''}`) : ' 予定なし'));
   });
 }
 
@@ -539,6 +547,14 @@ function commit(){ save(); scheduleDraw(); renderPlaces(); }
 
 function onCell(d){
   const days = monthData().days;
+  if(tool === 'free'){
+    const cur = days[d];
+    if(!isFree(cur)){ pushUndo(); days[d] = {text: toText(cur)}; commit(); }
+    selDay = d; renderEditor(); scheduleDraw();
+    const ta = $('#edText'); if(ta){ ta.focus({preventScroll:true}); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    if(window.innerWidth < 880) $('#editor').scrollIntoView({behavior:'smooth', block:'nearest'});
+    return;
+  }
   if(tool === 'edit'){
     selDay = d; renderEditor(); scheduleDraw();
     if(window.innerWidth < 880) $('#editor').scrollIntoView({behavior:'smooth', block:'nearest'});
@@ -557,13 +573,16 @@ function onCell(d){
 function renderTools(){
   const chips = [`<button type="button" class="chip edit" data-tool="edit" aria-pressed="${tool==='edit'}"><span class="t">選んで編集</span>1日ずつ細かく</button>`]
     .concat(state.presets.map(p => `<button type="button" class="chip" data-tool="${p.id}" aria-pressed="${tool===p.id}"><span class="t">${esc(timeStr(p) || '時間なし')}</span>${esc(p.place || '（場所未入力）')}</button>`))
+    .concat([`<button type="button" class="chip edit" data-tool="free" aria-pressed="${tool==='free'}"><span class="t">自由入力</span>好きな文字を入れる</button>`])
     .concat([`<button type="button" class="chip off" data-tool="off" aria-pressed="${tool==='off'}"><span class="t">お休み</span>赤字で表示</button>`]);
   $('#tools').innerHTML = chips.join('');
   $('#hint').textContent = tool === 'edit'
     ? 'カレンダーの日付をタップすると、その日の内容を編集できます。'
+    : tool === 'free'
+    ? '日付をタップして、入れたい文字を自由に入力してください（改行もそのまま表示されます）。'
     : '日付をタップすると入ります。同じ日をもう一度タップすると消えます。';
-  $('#bulk').innerHTML = tool === 'edit' ? '' : '毎週' + WD.map((w,i) => `<button type="button" data-wd="${i}" aria-label="毎週${w}曜日に入れる">${w}</button>`).join('') + 'にまとめて入れる';
-  $('#editor').hidden = !(tool === 'edit' && selDay);
+  $('#bulk').innerHTML = editing() ? '' : '毎週' + WD.map((w,i) => `<button type="button" data-wd="${i}" aria-label="毎週${w}曜日に入れる">${w}</button>`).join('') + 'にまとめて入れる';
+  $('#editor').hidden = !(editing() && selDay);
 }
 $('#tools').addEventListener('click', ev => {
   const b = ev.target.closest('[data-tool]'); if(!b) return;
@@ -581,11 +600,13 @@ $('#bulk').addEventListener('click', ev => {
 });
 
 /* ---------- day editor ---------- */
+// 既存の予定を自由入力の文字に変換（そのまま書き換えられるように）
+const toText = e => !e ? '' : isFree(e) ? e.text : e.off ? (e.place || 'お休み') : [timeStr(e), e.place].filter(Boolean).join('\n');
 function renderEditor(){
   const ed = $('#editor');
-  if(!(tool === 'edit' && selDay)){ ed.hidden = true; return; }
+  if(!(editing() && selDay)){ ed.hidden = true; return; }
   const {y,m} = state.cur, d = selDay, e = monthData().days[d];
-  const kind = !e ? 'none' : e.off ? 'off' : 'practice';
+  const kind = !e ? 'none' : isFree(e) ? 'free' : e.off ? 'off' : 'practice';
   const dow = new Date(y,m-1,d).getDay();
   let body = '';
   if(kind === 'practice') body = `
@@ -595,12 +616,15 @@ function renderEditor(){
       <label class="f wide" for="edPlace">場所・内容<input type="text" id="edPlace" list="places" value="${esc(e.place||'')}" placeholder="例：安岐体育館"></label>
     </div>
     <div class="row"><button type="button" class="btn" id="edToPreset">この内容をパターンに登録</button></div>`;
+  else if(kind === 'free') body = `
+    <label class="f" for="edText">表示する文字（改行もそのまま表示されます）<textarea id="edText" rows="3" placeholder="例：練習試合&#10;13時〜 ○○高校">${esc(e.text)}</textarea></label>`;
   else if(kind === 'off') body = `
     <label class="f" for="edOff">表示する文字（空欄なら「お休み」）<input type="text" id="edOff" value="${esc(e.place||'')}" placeholder="お休み"></label>`;
   ed.innerHTML = `
     <div class="row spread"><strong>${m}月${d}日（${WD[dow]}）</strong><button type="button" class="btn" id="edClose">閉じる</button></div>
     <div class="seg" role="group" aria-label="この日の種類">
       <button type="button" data-kind="practice" aria-pressed="${kind==='practice'}">練習</button>
+      <button type="button" data-kind="free" aria-pressed="${kind==='free'}">自由入力</button>
       <button type="button" data-kind="off" aria-pressed="${kind==='off'}">お休み・赤字</button>
       <button type="button" data-kind="none" aria-pressed="${kind==='none'}">なし</button>
     </div>${body}`;
@@ -613,8 +637,9 @@ $('#editor').addEventListener('click', ev => {
     const kind = k.dataset.kind, cur = days[d];
     pushUndo();
     if(kind === 'none') delete days[d];
+    else if(kind === 'free'){ if(!isFree(cur)) days[d] = {text: toText(cur)}; }
     else if(kind === 'off') days[d] = {off:true, place: cur && cur.off ? cur.place : ''};
-    else if(!cur || cur.off){ const p = state.presets[0]; days[d] = p ? {s:p.s, e:p.e, place:p.place} : {s:'', e:'', place:''}; }
+    else if(!cur || cur.off || isFree(cur)){ const p = state.presets[0]; days[d] = p ? {s:p.s, e:p.e, place:p.place} : {s:'', e:'', place:''}; }
     commit(); renderEditor(); return;
   }
   if(ev.target.id === 'edClose'){ selDay = null; renderTools(); scheduleDraw(); return; }
@@ -630,7 +655,7 @@ $('#editor').addEventListener('input', ev => {
   const e = monthData().days[selDay]; if(!e) return;
   if(editUndoArmed){ pushUndo(); editUndoArmed = false; }
   const id = ev.target.id, v = ev.target.value;
-  if(id === 'edS') e.s = v; else if(id === 'edE') e.e = v; else if(id === 'edPlace' || id === 'edOff') e.place = v;
+  if(id === 'edS') e.s = v; else if(id === 'edE') e.e = v; else if(id === 'edPlace' || id === 'edOff') e.place = v; else if(id === 'edText') e.text = v;
   commit();
 });
 
@@ -710,7 +735,7 @@ $('#fillPrev').addEventListener('click', () => {
   if(!prev || !Object.keys(prev.days).length){ toast(`${pm}月の予定がありません`); return; }
   const best = WD.map((_,wd) => {
     const count = {};
-    Object.entries(prev.days).forEach(([d,e]) => { if(!e.off && new Date(py,pm-1,+d).getDay() === wd){ const k = sig(e); count[k] = count[k] || {e, n:0}; count[k].n++; } });
+    Object.entries(prev.days).forEach(([d,e]) => { if(!e.off && !isFree(e) && new Date(py,pm-1,+d).getDay() === wd){ const k = sig(e); count[k] = count[k] || {e, n:0}; count[k].n++; } });
     const top = Object.values(count).sort((a,b) => b.n-a.n)[0];
     return top && top.n >= 2 ? top.e : null;
   });
